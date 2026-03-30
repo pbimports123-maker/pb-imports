@@ -11,7 +11,8 @@ import {
   BarChart3, 
   Settings, 
   LogOut,
-  Sparkles
+  Sparkles,
+  ScrollText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,7 @@ const MENU_ITEMS = [
   { icon: Package, label: "Produtos", href: "/admin/products" },
   { icon: Boxes, label: "Estoque", href: "/admin/stock" },
   { icon: Truck, label: "Fretes", href: "/admin/shipping" },
+  { icon: ScrollText, label: "Regras", href: "/admin/rules" },
   { icon: Tags, label: "Categorias", href: "/admin/categories" },
   { icon: BarChart3, label: "Relatórios", href: "/admin/reports" },
   { icon: Settings, label: "Configurações", href: "/admin/settings" },
