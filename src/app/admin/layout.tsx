@@ -1,11 +1,37 @@
+"use client";
+
 import { AdminSidebar } from "@/components/admin/sidebar";
-import { Bell, User } from "lucide-react";
+import { Bell, User, Loader2 } from "lucide-react";
+import { useAuth } from "@/components/auth-provider";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { session, loading, user } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !session) {
+      router.push('/login');
+    }
+  }, [session, loading, router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f9fafb]">
+        <Loader2 className="animate-spin text-[#1e3a5f]" size={48} />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return null; // Evita flash de conteúdo antes do redirecionamento
+  }
+
   return (
     <div className="flex min-h-screen bg-[#f9fafb]">
       <AdminSidebar />
@@ -24,7 +50,9 @@ export default function AdminLayout({
             <div className="h-8 w-[1px] bg-gray-200 mx-2"></div>
             <div className="flex items-center gap-3 cursor-pointer group">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-gray-900">Admin PB</p>
+                <p className="text-sm font-bold text-gray-900">
+                  {user?.email?.split('@')[0] || 'Admin'}
+                </p>
                 <p className="text-[10px] text-gray-500 uppercase">Super Admin</p>
               </div>
               <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 group-hover:bg-gray-200 transition-colors">
