@@ -13,7 +13,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Search, Filter, LayoutGrid } from "lucide-react";
+import { Search, Filter, LayoutGrid, Pill } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { MadeWithDyad } from "@/components/made-with-dyad";
