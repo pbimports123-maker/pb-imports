@@ -92,15 +92,17 @@ export default function Home() {
                 subtitleColor="#a8d9d9"
               />
             </Link>
-            <HelperCard 
-              title="Regras de Envio"
-              subtitle="Como funciona"
-              icon={ScrollText}
-              color="#d97706"
-              bgColor="#4d3319"
-              borderColor="#6b4423"
-              subtitleColor="#d9b09d"
-            />
+            <Link href="/regras" className="block">
+              <HelperCard 
+                title="Regras de Envio"
+                subtitle="Como funciona"
+                icon={ScrollText}
+                color="#d97706"
+                bgColor="#4d3319"
+                borderColor="#6b4423"
+                subtitleColor="#d9b09d"
+              />
+            </Link>
           </div>
 
           {/* Info Box */}
