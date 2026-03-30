@@ -1,59 +1,43 @@
 "use client";
 
-import { ShoppingCart, Pill, Search, Menu } from "lucide-react";
+import { Bell, Share2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useCart } from "@/hooks/use-cart";
-import { useState } from "react";
-import { CartDrawer } from "./cart-drawer";
 
 export function Navbar() {
-  const { totalItems } = useCart();
-  const [isCartOpen, setIsCartOpen] = useState(false);
-
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 font-bold text-xl text-primary">
-          <div className="bg-primary text-primary-foreground p-1.5 rounded-lg">
-            <Pill className="w-6 h-6" />
+    <header className="sticky top-0 z-50 w-full border-b border-[#404040] bg-[#1a1a1a]">
+      <div className="container mx-auto px-4 h-20 flex items-center justify-between">
+        {/* Logo PB Imports */}
+        <div className="flex flex-col leading-none">
+          <div className="flex items-center gap-1">
+            <span className="text-3xl font-black text-[#1e3a5f] tracking-tighter">PB</span>
+            <Sparkles className="w-4 h-4 text-[#fbbf24] fill-[#fbbf24]" />
           </div>
-          <span className="hidden sm:inline">Respect Pharma</span>
+          <span className="text-xs font-bold text-[#1e3a5f] uppercase tracking-[0.2em] ml-0.5">imports</span>
         </div>
 
-        <div className="flex-grow max-w-md hidden md:flex relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input 
-            placeholder="Buscar medicamentos..." 
-            className="pl-10 bg-muted/50 border-none focus-visible:ring-1"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="relative"
-            onClick={() => setIsCartOpen(true)}
-          >
-            <ShoppingCart className="w-6 h-6" />
-            {totalItems > 0 && (
-              <Badge 
-                className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px]"
-                variant="destructive"
-              >
-                {totalItems}
+        <div className="flex items-center gap-4">
+          <div className="hidden sm:flex items-center gap-2 cursor-pointer group">
+            <div className="relative">
+              <Bell className="w-5 h-5 text-[#9ca3af] group-hover:text-white transition-colors" />
+              <Badge className="absolute -top-2 -right-2 h-4 min-w-4 flex items-center justify-center p-0 text-[10px] bg-[#fbbf24] text-black border-none">
+                52
               </Badge>
-            )}
-          </Button>
-          <Button variant="ghost" size="icon" className="md:hidden">
-            <Menu className="w-6 h-6" />
+            </div>
+            <span className="text-xs text-[#9ca3af] group-hover:text-white transition-colors">novidades</span>
+          </div>
+
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="border-[#fbbf24] text-[#fbbf24] hover:bg-[#fbbf24] hover:text-black transition-all gap-2"
+          >
+            <Share2 size={16} />
+            <span className="hidden xs:inline">Compartilhar</span>
           </Button>
         </div>
       </div>
-
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </header>
   );
 }
