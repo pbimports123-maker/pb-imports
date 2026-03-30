@@ -1,32 +1,69 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { CATEGORIES, PRODUCTS } from "@/lib/mock-data";
+import { useState, useMemo, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Navbar } from "@/components/navbar";
 import { StatusBadge } from "@/components/status-badge";
 import { HelperCard } from "@/components/helper-card";
 import { CategoryCard } from "@/components/category-card";
 import { Input } from "@/components/ui/input";
-import { Search, Bell, Lightbulb, Truck, ScrollText, X } from "lucide-react";
-import { CategoryWithStats } from "@/types/product";
+import { Search, Bell, Lightbulb, Truck, ScrollText, X, Loader2 } from "lucide-react";
+import { Product, Category, CategoryWithStats } from "@/types/product";
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import Link from "next/link";
 
 export default function Home() {
   const [search, setSearch] = useState("");
   const [showAlert, setShowAlert] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        
+        // Buscar Categorias
+        const { data: catData, error: catError } = await supabase
+          .from('categories')
+          .select('*')
+          .order('sort_order', { ascending: true });
+        
+        if (catError) throw catError;
+        setCategories(catData || []);
+
+        // Buscar Produtos Ativos
+        const { data: prodData, error: prodError } = await supabase
+          .from('products')
+          .select('*')
+          .eq('is_active', true)
+          .order('name', { ascending: true });
+
+        if (prodError) throw prodError;
+        setProducts(prodData || []);
+
+      } catch (error) {
+        console.error("Erro ao buscar dados:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, []);
 
   // Lógica de Agrupamento e Estatísticas
   const categoriesWithStats = useMemo(() => {
-    return CATEGORIES.map(cat => {
-      const catProducts = PRODUCTS.filter(p => p.categoriaId === cat.id);
+    return categories.map(cat => {
+      const catProducts = products.filter(p => p.category_id === cat.id);
       const filteredProducts = catProducts.filter(p => 
-        p.nome.toLowerCase().includes(search.toLowerCase()) || 
-        p.marca.toLowerCase().includes(search.toLowerCase())
+        p.name.toLowerCase().includes(search.toLowerCase()) || 
+        p.brand.toLowerCase().includes(search.toLowerCase())
       );
       
-      const marcas = new Set(catProducts.map(p => p.marca));
-      const emFalta = catProducts.filter(p => p.emFalta).length;
+      const marcas = new Set(catProducts.map(p => p.brand));
+      const emFalta = catProducts.filter(p => p.is_out_of_stock).length;
 
       return {
         ...cat,
@@ -35,10 +72,10 @@ export default function Home() {
         produtos: filteredProducts
       } as CategoryWithStats;
     }).filter(cat => cat.produtos.length > 0 || search === "");
-  }, [search]);
+  }, [categories, products, search]);
 
-  const totalAvailable = PRODUCTS.filter(p => !p.emFalta).length;
-  const totalOutOfStock = PRODUCTS.filter(p => p.emFalta).length;
+  const totalAvailable = products.filter(p => !p.is_out_of_stock).length;
+  const totalOutOfStock = products.filter(p => p.is_out_of_stock).length;
 
   return (
     <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col">
@@ -65,7 +102,7 @@ export default function Home() {
             />
           </div>
 
-          {/* Alert Box - Updated Layout */}
+          {/* Alert Box */}
           {showAlert && (
             <div className="bg-[#2d2d2d] border-l-4 border-[#fbbf24] p-4 rounded-r-md flex items-center gap-4 relative mb-6 cursor-pointer hover:bg-[#353535] transition-colors group">
               <div className="bg-[#fbbf24]/10 p-2.5 rounded-full shrink-0">
@@ -125,16 +162,25 @@ export default function Home() {
 
         {/* Categories List */}
         <div className="flex flex-col gap-3">
-          {categoriesWithStats.map((category) => (
-            <CategoryCard key={category.id} category={category} />
-          ))}
-          
-          {categoriesWithStats.length === 0 && (
-            <div className="text-center py-20 bg-[#2d2d2d] rounded-lg border border-dashed border-[#404040]">
-              <Search className="w-12 h-12 mx-auto text-[#6b7280] opacity-20 mb-4" />
-              <h3 className="text-xl font-medium">Nenhum produto encontrado</h3>
-              <p className="text-[#9ca3af] mt-2">Tente ajustar sua busca.</p>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <Loader2 className="w-10 h-10 text-[#fbbf24] animate-spin" />
+              <p className="text-[#9ca3af]">Carregando lista de produtos...</p>
             </div>
+          ) : (
+            <>
+              {categoriesWithStats.map((category) => (
+                <CategoryCard key={category.id} category={category} />
+              ))}
+              
+              {categoriesWithStats.length === 0 && (
+                <div className="text-center py-20 bg-[#2d2d2d] rounded-lg border border-dashed border-[#404040]">
+                  <Search className="w-12 h-12 mx-auto text-[#6b7280] opacity-20 mb-4" />
+                  <h3 className="text-xl font-medium">Nenhum produto encontrado</h3>
+                  <p className="text-[#9ca3af] mt-2">Tente ajustar sua busca.</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>
@@ -142,7 +188,7 @@ export default function Home() {
       <footer className="border-t border-[#404040] py-8 mt-10">
         <div className="container mx-auto px-4 text-center">
           <p className="text-xs text-[#6b7280] uppercase tracking-widest mb-4">
-            PB IMPORTS · {PRODUCTS.length} produtos
+            PB IMPORTS · {products.length} produtos
           </p>
           <MadeWithDyad />
         </div>

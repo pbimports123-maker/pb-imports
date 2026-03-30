@@ -21,13 +21,13 @@ export function CategoryCard({ category }: CategoryCardProps) {
         <div className="flex items-center gap-3">
           <div 
             className="w-10 h-10 rounded-md flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-            style={{ backgroundColor: category.cor }}
+            style={{ backgroundColor: category.color }}
           >
-            {category.acronimo}
+            {category.acronym}
           </div>
           <div className="flex flex-col">
             <h3 className="text-white font-semibold uppercase text-sm tracking-wide">
-              {category.nome}
+              {category.name}
             </h3>
             <div className="flex items-center gap-1.5 text-xs">
               <span className="text-[#9ca3af]">{category.totalMarcas} marcas</span>
@@ -55,14 +55,14 @@ export function CategoryCard({ category }: CategoryCardProps) {
               className="flex items-center justify-between p-3 rounded-md bg-black/30 hover:bg-black/50 transition-colors"
             >
               <div className="flex flex-col">
-                <span className="text-[#e5e7eb] font-medium text-sm">{product.nome}</span>
-                <span className="text-[#6b7280] text-xs">{product.marca}</span>
+                <span className="text-[#e5e7eb] font-medium text-sm">{product.name}</span>
+                <span className="text-[#6b7280] text-xs">{product.brand}</span>
               </div>
               <span className={cn(
                 "text-xs font-semibold",
-                product.emFalta ? "text-[#ef4444]" : "text-[#10b981]"
+                product.is_out_of_stock ? "text-[#ef4444]" : "text-[#10b981]"
               )}>
-                {product.emFalta ? "Em falta" : "Disponível"}
+                {product.is_out_of_stock ? "Em falta" : "Disponível"}
               </span>
             </div>
           ))}
