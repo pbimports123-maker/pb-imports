@@ -65,15 +65,23 @@ export default function Home() {
             />
           </div>
 
-          {/* Alert Box */}
+          {/* Alert Box - Updated Layout */}
           {showAlert && (
-            <div className="bg-[#2d2d2d] border-l-4 border-[#fbbf24] p-4 rounded-r-md flex gap-4 relative mb-6">
-              <Bell className="text-[#fbbf24] shrink-0" size={20} />
+            <div className="bg-[#2d2d2d] border-l-4 border-[#fbbf24] p-4 rounded-r-md flex items-center gap-4 relative mb-6 cursor-pointer hover:bg-[#353535] transition-colors group">
+              <div className="bg-[#fbbf24]/10 p-2.5 rounded-full shrink-0">
+                <Bell className="text-[#fbbf24]" size={20} />
+              </div>
               <div className="flex-grow">
-                <h4 className="font-bold text-sm">52 atualizações desde sua última visita</h4>
+                <h4 className="font-bold text-sm text-white">52 atualizações desde sua última visita</h4>
                 <p className="text-xs text-[#9ca3af]">Toque para ver o que mudou</p>
               </div>
-              <button onClick={() => setShowAlert(false)} className="text-[#6b7280] hover:text-white">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowAlert(false);
+                }} 
+                className="text-[#6b7280] hover:text-white p-1 transition-colors"
+              >
                 <X size={18} />
               </button>
             </div>
