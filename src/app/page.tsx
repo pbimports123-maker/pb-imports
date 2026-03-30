@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Bell, Lightbulb, Truck, ScrollText, X } from "lucide-react";
 import { CategoryWithStats } from "@/types/product";
 import { MadeWithDyad } from "@/components/made-with-dyad";
+import Link from "next/link";
 
 export default function Home() {
   const [search, setSearch] = useState("");
@@ -80,15 +81,17 @@ export default function Home() {
 
           {/* Helper Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-            <HelperCard 
-              title="Tabela de Fretes"
-              subtitle="Valores de entrega"
-              icon={Truck}
-              color="#10b981"
-              bgColor="#1a5f5f"
-              borderColor="#0d7a7a"
-              subtitleColor="#a8d9d9"
-            />
+            <Link href="/fretes" className="block">
+              <HelperCard 
+                title="Tabela de Fretes"
+                subtitle="Valores de entrega"
+                icon={Truck}
+                color="#10b981"
+                bgColor="#1a5f5f"
+                borderColor="#0d7a7a"
+                subtitleColor="#a8d9d9"
+              />
+            </Link>
             <HelperCard 
               title="Regras de Envio"
               subtitle="Como funciona"
