@@ -25,7 +25,7 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [storeSettings, setStoreSettings] = useState({
     id: "",
-    store_name: "",
+    store_name: "PB Imports",
     contact_email: "",
     contact_phone: "",
     address: "",
@@ -42,12 +42,13 @@ export default function AdminSettingsPage() {
       const { data, error } = await supabase
         .from('store_settings')
         .select('*')
-        .single();
+        .maybeSingle(); // Usando maybeSingle para não dar erro se estiver vazio
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
       if (data) setStoreSettings(data);
     } catch (error: any) {
-      toast.error("Erro ao carregar configurações: " + error.message);
+      console.error("Erro ao carregar configurações:", error);
+      toast.error("Erro ao carregar configurações.");
     } finally {
       setLoading(false);
     }
@@ -56,15 +57,21 @@ export default function AdminSettingsPage() {
   async function handleSaveStore() {
     try {
       setSaving(true);
+      
+      // Removemos o ID se for uma string vazia para o upsert funcionar corretamente
+      const payload = { ...storeSettings };
+      if (!payload.id) delete (payload as any).id;
+
       const { error } = await supabase
         .from('store_settings')
         .upsert({
-          ...storeSettings,
+          ...payload,
           updated_at: new Date().toISOString()
         });
 
       if (error) throw error;
       toast.success("Configurações da loja atualizadas!");
+      fetchSettings(); // Recarrega para pegar o ID se for novo
     } catch (error: any) {
       toast.error("Erro ao salvar: " + error.message);
     } finally {
