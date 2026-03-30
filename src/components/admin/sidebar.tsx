@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   Package, 
@@ -15,6 +15,8 @@ import {
   ScrollText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/auth-provider";
+import { toast } from "sonner";
 
 const MENU_ITEMS = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/admin" },
@@ -29,6 +31,18 @@ const MENU_ITEMS = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast.success("Sessão encerrada com sucesso!");
+      router.push("/login");
+    } catch (error) {
+      toast.error("Erro ao sair do sistema.");
+    }
+  };
 
   return (
     <aside className="w-64 bg-[#1f2937] text-white flex flex-col h-screen sticky top-0">
@@ -64,7 +78,10 @@ export function AdminSidebar() {
       </nav>
 
       <div className="p-4 border-t border-gray-700">
-        <button className="flex items-center gap-3 px-4 py-3 w-full text-left text-gray-400 hover:text-red-400 transition-colors text-sm font-medium">
+        <button 
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-4 py-3 w-full text-left text-gray-400 hover:text-red-400 transition-colors text-sm font-medium"
+        >
           <LogOut size={20} />
           Sair do Painel
         </button>
