@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth-provider';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Lock } from 'lucide-react';
 
 export default function LoginPage() {
   const { session, loading } = useAuth();
@@ -34,11 +34,23 @@ export default function LoginPage() {
             <span className="text-4xl font-black text-white tracking-tighter">PB</span>
             <Sparkles className="w-6 h-6 text-[#fbbf24] fill-[#fbbf24]" />
           </div>
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-[0.3em]">painel administrativo</span>
+          <div className="flex items-center gap-2 text-gray-400">
+            <Lock size={12} />
+            <span className="text-xs font-bold uppercase tracking-[0.3em]">acesso restrito</span>
+          </div>
+        </div>
+
+        <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-center">
+          <p className="text-xs text-blue-400">
+            O cadastro público está desativado. <br />
+            Entre com suas credenciais de administrador.
+          </p>
         </div>
 
         <Auth
           supabaseClient={supabase}
+          view="sign_in"
+          showLinks={false} // Remove os links de "Cadastre-se" e "Esqueci minha senha"
           appearance={{
             theme: ThemeSupa,
             variables: {
@@ -51,11 +63,6 @@ export default function LoginPage() {
                   inputPlaceholder: '#6b7280',
                 }
               }
-            },
-            className: {
-              container: 'auth-container',
-              button: 'auth-button',
-              input: 'auth-input',
             }
           }}
           localization={{
@@ -63,23 +70,8 @@ export default function LoginPage() {
               sign_in: {
                 email_label: 'E-mail',
                 password_label: 'Senha',
-                button_label: 'Entrar',
-                loading_button_label: 'Entrando...',
-                social_provider_text: 'Entrar com {{provider}}',
-                link_text: 'Já tem uma conta? Entre',
-              },
-              sign_up: {
-                email_label: 'E-mail',
-                password_label: 'Senha',
-                button_label: 'Cadastrar',
-                loading_button_label: 'Cadastrando...',
-                link_text: 'Não tem uma conta? Cadastre-se',
-              },
-              forgotten_password: {
-                email_label: 'E-mail',
-                password_label: 'Senha',
-                button_label: 'Recuperar senha',
-                link_text: 'Esqueceu sua senha?',
+                button_label: 'Entrar no Painel',
+                loading_button_label: 'Autenticando...',
               }
             }
           }}
@@ -89,7 +81,7 @@ export default function LoginPage() {
       </div>
       
       <p className="mt-8 text-gray-500 text-xs uppercase tracking-widest">
-        PB Imports · Acesso Restrito
+        PB Imports · Sistema de Gestão Interna
       </p>
     </div>
   );
