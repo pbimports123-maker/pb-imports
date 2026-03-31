@@ -1,298 +1,175 @@
 "use client";
-
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  Plus, 
-  Search, 
-  Edit2, 
-  Trash2, 
-  Tags,
-  Save,
-  X
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
+const PALETTE = ["#00e5ff","#1565ff","#ffd600","#00ff9d","#ff2d5f","#a855f7","#6366f1","#8b5cf6","#b45309","#06b6d4","#f97316","#64748b"];
+
+type Category = { id: string; name: string; acronym: string; color: string; sort_order: number };
+
+type FormState = { name: string; acronym: string; color: string; sort_order: number };
+
 export default function AdminCategoriesPage() {
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<any>(null);
-  
-  // Form state
-  const [formData, setFormData] = useState({
-    name: "",
-    acronym: "",
-    color: "#1e3a5f",
-    sort_order: 0
-  });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Category | null>(null);
+  const [form, setForm] = useState<FormState>({ name: "", acronym: "", color: PALETTE[0], sort_order: 1 });
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
+  useEffect(() => { fetchCategories(); }, []);
 
   async function fetchCategories() {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('sort_order', { ascending: true });
-
+      const { data, error } = await supabase.from("categories").select("id,name,acronym,color,sort_order").order("sort_order", { ascending: true });
       if (error) throw error;
-      setCategories(data || []);
-    } catch (error: any) {
-      toast.error("Erro ao carregar categorias: " + error.message);
+      setCategories((data as Category[]) || []);
+    } catch (err: any) {
+      toast.error("Erro ao carregar categorias: " + err.message);
     } finally {
       setLoading(false);
     }
   }
 
-  const handleOpenModal = (category: any = null) => {
-    if (category) {
-      setEditingCategory(category);
-      setFormData({
-        name: category.name,
-        acronym: category.acronym,
-        color: category.color,
-        sort_order: category.sort_order
-      });
+  const filtered = useMemo(() => categories.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()) || c.acronym.toLowerCase().includes(search.toLowerCase())), [categories, search]);
+
+  const openModal = (cat?: Category) => {
+    if (cat) {
+      setEditing(cat);
+      setForm({ name: cat.name, acronym: cat.acronym, color: cat.color, sort_order: cat.sort_order });
     } else {
-      setEditingCategory(null);
-      setFormData({
-        name: "",
-        acronym: "",
-        color: "#1e3a5f",
-        sort_order: categories.length + 1
-      });
+      setEditing(null);
+      setForm({ name: "", acronym: "", color: PALETTE[0], sort_order: categories.length + 1 });
     }
-    setIsModalOpen(true);
+    setModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const saveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (editingCategory) {
-        const { error } = await supabase
-          .from('categories')
-          .update(formData)
-          .eq('id', editingCategory.id);
+      if (!form.name || !form.acronym) throw new Error("Preencha nome e acrÙnimo");
+      if (editing) {
+        const { error } = await supabase.from("categories").update(form).eq("id", editing.id);
         if (error) throw error;
         toast.success("Categoria atualizada!");
       } else {
-        const { error } = await supabase
-          .from('categories')
-          .insert([formData]);
+        const { error } = await supabase.from("categories").insert([form]);
         if (error) throw error;
         toast.success("Categoria criada!");
       }
-      setIsModalOpen(false);
+      setModalOpen(false);
       fetchCategories();
-    } catch (error: any) {
-      toast.error("Erro ao salvar: " + error.message);
+    } catch (err: any) {
+      toast.error("Erro ao salvar: " + err.message);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta categoria? Produtos vinculados podem ficar sem categoria.")) return;
-    
+  const deleteCategory = async (id: string) => {
+    if (!confirm("Excluir esta categoria? Produtos vinculados podem ficar sem categoria.")) return;
     try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from("categories").delete().eq("id", id);
       if (error) throw error;
-      toast.success("Categoria exclu√≠da!");
+      toast.success("Categoria excluÌda!");
       fetchCategories();
-    } catch (error: any) {
-      toast.error("Erro ao excluir: " + error.message);
+    } catch (err: any) {
+      toast.error("Erro ao excluir: " + err.message);
     }
   };
-
-  const filteredCategories = categories.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.acronym.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="content">
+      <style jsx>{`
+        .header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;}
+        .title{font-family:"Orbitron",monospace;font-size:26px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--text-primary);} .sub{font-family:"Share Tech Mono",monospace;font-size:11px;color:var(--text-muted);letter-spacing:2px;margin-top:6px;}
+        .btn-main{display:flex;align-items:center;gap:8px;padding:12px 20px;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-blue));border:none;color:var(--bg-void);font-family:"Orbitron",monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;}
+        .search{margin-bottom:14px;} .search input{width:100%;max-width:420px;padding:11px 14px;background:var(--bg-card);border:1px solid var(--border-dim);color:var(--text-primary);font-family:"Share Tech Mono",monospace;font-size:12px;} .search input:focus{outline:none;border-color:var(--accent-cyan);box-shadow:0 0 14px rgba(0,229,255,0.2);} 
+        .panel{background:var(--bg-card);border:1px solid var(--border-dim);} table{width:100%;border-collapse:collapse;} thead tr{border-bottom:1px solid var(--border-dim);background:rgba(0,229,255,0.04);} th{padding:12px 16px;font-family:"Share Tech Mono",monospace;font-size:10px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;text-align:left;} td{padding:12px 16px;font-size:14px;} tbody tr{border-bottom:1px solid var(--border-dim);} tbody tr:hover{background:rgba(0,229,255,0.04);} .color-dot{width:24px;height:24px;border-radius:4px;border:1px solid var(--border-glow);box-shadow:0 0 10px currentColor;}
+        .acronym{font-family:"Orbitron",monospace;font-weight:700;color:var(--accent-cyan);} .order{font-family:"Orbitron",monospace;font-weight:700;color:var(--accent-gold);} .actions{display:flex;gap:8px;} .btn-ghost{width:32px;height:32px;border:1px solid var(--border-dim);background:transparent;color:var(--text-muted);cursor:pointer;} .btn-ghost:hover{border-color:var(--accent-cyan);color:var(--accent-cyan);} .btn-del:hover{border-color:var(--accent-red);color:var(--accent-red);}
+        .empty{padding:48px;text-align:center;font-family:"Share Tech Mono",monospace;color:var(--text-muted);letter-spacing:2px;}
+        .modal-overlay{position:fixed;inset:0;background:rgba(2,4,8,0.85);backdrop-filter:blur(6px);display:${modalOpen?"flex":"none"};align-items:center;justify-content:center;z-index:200;} .modal{background:var(--bg-card);border:1px solid var(--border-glow);width:420px;max-width:95vw;padding:18px;} .modal-title{font-family:"Orbitron",monospace;font-size:14px;color:var(--accent-cyan);letter-spacing:3px;margin-bottom:12px;} .form{display:flex;flex-direction:column;gap:10px;} .label{font-family:"Share Tech Mono",monospace;font-size:9px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;} .input{padding:10px 12px;background:var(--bg-card2);border:1px solid var(--border-dim);color:var(--text-primary);font-family:"Rajdhani",sans-serif;font-size:13px;} .input:focus{outline:none;border-color:var(--accent-cyan);} .palette{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;} .swatch{width:100%;aspect-ratio:1;border:2px solid var(--border-dim);cursor:pointer;} .swatch.selected{border-color:var(--accent-cyan);box-shadow:0 0 12px currentColor;} .modal-actions{display:flex;gap:8px;margin-top:6px;} .btn-cancel{flex:1;padding:10px;border:1px solid var(--border-dim);background:transparent;color:var(--text-muted);font-family:"Share Tech Mono",monospace;font-size:10px;letter-spacing:2px;cursor:pointer;} .btn-save{flex:1;padding:10px;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-blue));border:none;color:var(--bg-void);font-family:"Orbitron",monospace;font-size:10px;letter-spacing:2px;cursor:pointer;}
+        @media(max-width:900px){.header{flex-direction:column;gap:10px;} .btn-main{width:100%;justify-content:center;} }
+      `}</style>
+
+      <div className="header">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Categorias</h1>
-          <p className="text-sm text-gray-500">Organize seus produtos em grupos l√≥gicos.</p>
+          <div className="title">Categorias</div>
+          <div className="sub">// Organize seus produtos em grupos lÛgicos.</div>
         </div>
-        <Button onClick={() => handleOpenModal()} className="bg-[#1e3a5f] hover:bg-[#162a45] gap-2">
-          <Plus size={18} />
-          Nova Categoria
-        </Button>
+        <button className="btn-main" onClick={()=>openModal()}>+ Nova Categoria</button>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <Input 
-              placeholder="Buscar categoria..." 
-              className="pl-10"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-        </div>
+      <div className="search">
+        <input placeholder="Buscar categoria..." value={search} onChange={(e)=>setSearch(e.target.value)} />
+      </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-50">
-              <TableHead className="w-[60px]">Cor</TableHead>
-              <TableHead>Nome</TableHead>
-              <TableHead>Acr√¥nimo</TableHead>
-              <TableHead>Ordem</TableHead>
-              <TableHead className="text-right">A√ß√µes</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+      <div className="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>Cor</th>
+              <th>Nome</th>
+              <th>AcrÙnimo</th>
+              <th>Ordem</th>
+              <th>AÁıes</th>
+            </tr>
+          </thead>
+          <tbody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center text-gray-500">
-                  Carregando categorias...
-                </TableCell>
-              </TableRow>
-            ) : filteredCategories.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center text-gray-500">
-                  Nenhuma categoria encontrada.
-                </TableCell>
-              </TableRow>
+              <tr><td colSpan={5} className="empty">// CARREGANDO...</td></tr>
+            ) : filtered.length===0 ? (
+              <tr><td colSpan={5} className="empty">// NENHUMA CATEGORIA</td></tr>
             ) : (
-              filteredCategories.map((category) => (
-                <TableRow key={category.id} className="hover:bg-gray-50">
-                  <TableCell>
-                    <div 
-                      className="w-8 h-8 rounded-md border border-gray-200" 
-                      style={{ backgroundColor: category.color }}
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium text-gray-900">
-                    {category.name}
-                  </TableCell>
-                  <TableCell>
-                    <span className="px-2 py-1 bg-gray-100 rounded text-xs font-bold text-gray-600">
-                      {category.acronym}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-gray-500">
-                    {category.sort_order}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-gray-500"
-                        onClick={() => handleOpenModal(category)}
-                      >
-                        <Edit2 size={16} />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-red-500"
-                        onClick={() => handleDelete(category.id)}
-                      >
-                        <Trash2 size={16} />
-                      </Button>
+              filtered.map((cat)=>(
+                <tr key={cat.id}>
+                  <td><div className="color-dot" style={{backgroundColor:cat.color,boxShadow:`0 0 10px ${cat.color}`}}></div></td>
+                  <td>{cat.name}</td>
+                  <td className="acronym">{cat.acronym}</td>
+                  <td className="order">{cat.sort_order}</td>
+                  <td>
+                    <div className="actions">
+                      <button className="btn-ghost" onClick={()=>openModal(cat)}>?</button>
+                      <button className="btn-ghost btn-del" onClick={()=>deleteCategory(cat.id)}>?</button>
                     </div>
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               ))
             )}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
 
-      {/* Modal de Cadastro/Edi√ß√£o */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editingCategory ? "Editar Categoria" : "Nova Categoria"}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome da Categoria</Label>
-              <Input 
-                id="name" 
-                value={formData.name} 
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                placeholder="Ex: Eletr√¥nicos"
-                required
-              />
+      <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget&&setModalOpen(false)}>
+        <div className="modal">
+          <div className="modal-title">{editing?"Editar Categoria":"Nova Categoria"}</div>
+          <form className="form" onSubmit={saveCategory}>
+            <div>
+              <div className="label">Nome</div>
+              <input className="input" value={form.name} onChange={(e)=>setForm({...form,name:e.target.value})} required />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="acronym">Acr√¥nimo (2-3 letras)</Label>
-                <Input 
-                  id="acronym" 
-                  value={formData.acronym} 
-                  onChange={(e) => setFormData({...formData, acronym: e.target.value.toUpperCase()})}
-                  placeholder="Ex: EL"
-                  maxLength={3}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sort_order">Ordem de Exibi√ß√£o</Label>
-                <Input 
-                  id="sort_order" 
-                  type="number"
-                  value={formData.sort_order} 
-                  onChange={(e) => setFormData({...formData, sort_order: parseInt(e.target.value)})}
-                  required
-                />
+            <div>
+              <div className="label">AcrÙnimo (2-4)</div>
+              <input className="input" value={form.acronym} maxLength={4} onChange={(e)=>setForm({...form,acronym:e.target.value.toUpperCase()})} required />
+            </div>
+            <div>
+              <div className="label">Ordem</div>
+              <input className="input" type="number" value={form.sort_order} onChange={(e)=>setForm({...form,sort_order:Number(e.target.value)})} required />
+            </div>
+            <div>
+              <div className="label">Cor</div>
+              <div className="palette">
+                {PALETTE.map((c)=>(
+                  <div key={c} className={`swatch ${form.color===c?"selected":""}`} style={{backgroundColor:c}} onClick={()=>setForm({...form,color:c})}></div>
+                ))}
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="color">Cor da Categoria</Label>
-              <div className="flex gap-3 items-center">
-                <Input 
-                  id="color" 
-                  type="color"
-                  className="w-12 h-10 p-1 cursor-pointer"
-                  value={formData.color} 
-                  onChange={(e) => setFormData({...formData, color: e.target.value})}
-                />
-                <span className="text-sm text-gray-500 font-mono">{formData.color}</span>
-              </div>
+            <div className="modal-actions">
+              <button type="button" className="btn-cancel" onClick={()=>setModalOpen(false)}>Cancelar</button>
+              <button type="submit" className="btn-save">{editing?"Salvar":"Criar"}</button>
             </div>
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" className="bg-[#1e3a5f] hover:bg-[#162a45]">
-                {editingCategory ? "Salvar Altera√ß√µes" : "Criar Categoria"}
-              </Button>
-            </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </div>
     </div>
   );
 }

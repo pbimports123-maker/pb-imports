@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/hooks/use-cart";
@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Respect Pharma - Listagem de Medicamentos",
-  description: "Sistema de busca e compra de medicamentos",
+  title: "PB Imports - Lista de Produtos",
+  description: "PB Imports - plataforma de vendas",
 };
 
 export default function RootLayout({

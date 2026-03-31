@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +23,7 @@ export default function FretesPage() {
         if (error) throw error;
 
         // Agrupar por tipo de serviço
+        const order = ["PAC","SEDEX","Transportadoras","Fretes VIP"];
         const grouped = data.reduce((acc: any, rate: any) => {
           const type = rate.service_type;
           if (!acc[type]) {
@@ -42,7 +43,8 @@ export default function FretesPage() {
           return acc;
         }, {});
 
-        setShippingData(Object.values(grouped));
+        const ordered = Object.values(grouped).sort((a: any, b: any) => order.indexOf(a.title) - order.indexOf(b.title));
+        setShippingData(ordered);
       } catch (error) {
         console.error("Erro ao buscar fretes:", error);
       } finally {
@@ -63,12 +65,12 @@ export default function FretesPage() {
         </Link>
         <div className="flex-grow flex justify-center pr-10">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#fbbf24] rounded flex items-center justify-center">
-              <span className="text-black font-black text-xs">P</span>
+            <div className="w-9 h-9 rounded-md bg-[#22d3ee] flex items-center justify-center text-black font-black text-xs">
+              PB
             </div>
             <div className="flex flex-col leading-none">
-              <span className="text-xs font-bold tracking-tighter">RESPECT</span>
-              <span className="text-[10px] font-bold text-[#fbbf24] tracking-widest">PHARMA</span>
+              <span className="text-sm font-bold tracking-[0.16em] text-[#22d3ee] uppercase">PB IMPORTS</span>
+              <span className="text-[10px] font-semibold text-[#6b7280] tracking-[0.24em] uppercase">Disponibilidade</span>
             </div>
           </div>
         </div>
@@ -129,7 +131,7 @@ export default function FretesPage() {
         )}
 
         <footer className="mt-12 py-8 text-center border-t border-[#404040]">
-          <p className="text-xs text-[#6b7280]">Respect Pharma © 2026</p>
+          <p className="text-xs text-[#6b7280]">PB IMPORTS © 2026</p>
         </footer>
       </main>
     </div>

@@ -1,36 +1,32 @@
 "use client";
-
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  Store, 
-  User, 
-  Shield, 
-  Save, 
-  Loader2, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Instagram 
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { Shield } from "lucide-react";
+
+type StoreSettings = {
+  id?: string;
+  store_name: string;
+  contact_email: string;
+  contact_phone: string;
+  address: string;
+  instagram_url: string;
+};
+
+type TabKey = "store" | "users" | "security";
 
 export default function AdminSettingsPage() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [storeSettings, setStoreSettings] = useState({
-    id: "",
+  const [settings, setSettings] = useState<StoreSettings>({
     store_name: "PB Imports",
     contact_email: "",
     contact_phone: "",
     address: "",
-    instagram_url: ""
+    instagram_url: "",
   });
+  const [tab, setTab] = useState<TabKey>("store");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<string>("// Nenhuma alteraÁ„o salva");
 
   useEffect(() => {
     fetchSettings();
@@ -39,198 +35,166 @@ export default function AdminSettingsPage() {
   async function fetchSettings() {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('store_settings')
-        .select('*')
-        .maybeSingle(); // Usando maybeSingle para n√£o dar erro se estiver vazio
-
+      const { data, error } = await supabase.from("store_settings").select("*").maybeSingle();
       if (error) throw error;
-      if (data) setStoreSettings(data);
-    } catch (error: any) {
-      console.error("Erro ao carregar configura√ß√µes:", error);
-      toast.error("Erro ao carregar configura√ß√µes.");
+      if (data) setSettings(data as StoreSettings);
+    } catch (err: any) {
+      toast.error("Erro ao carregar configuraÁıes: " + err.message);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleSaveStore() {
+  const filledPct = useMemo(() => {
+    const total = 5; // fields we track
+    const filled = [settings.store_name, settings.contact_email, settings.contact_phone, settings.address, settings.instagram_url].filter(
+      (v) => v && v.trim().length > 0
+    ).length;
+    return { filled, pct: Math.round((filled / total) * 100) };
+  }, [settings]);
+
+  async function handleSave() {
     try {
       setSaving(true);
-      
-      // Removemos o ID se for uma string vazia para o upsert funcionar corretamente
-      const payload = { ...storeSettings };
-      if (!payload.id) delete (payload as any).id;
-
-      const { error } = await supabase
-        .from('store_settings')
-        .upsert({
-          ...payload,
-          updated_at: new Date().toISOString()
-        });
-
+      const payload = { ...settings } as any;
+      if (!payload.id) delete payload.id;
+      const { error } = await supabase.from("store_settings").upsert({
+        ...payload,
+        updated_at: new Date().toISOString(),
+      });
       if (error) throw error;
-      toast.success("Configura√ß√µes da loja atualizadas!");
-      fetchSettings(); // Recarrega para pegar o ID se for novo
-    } catch (error: any) {
-      toast.error("Erro ao salvar: " + error.message);
+      const stamp = new Date().toLocaleString("pt-BR");
+      setLastSaved(`// Salvo em ${stamp}`);
+      toast.success("ConfiguraÁıes atualizadas!");
+      fetchSettings();
+    } catch (err: any) {
+      toast.error("Erro ao salvar: " + err.message);
     } finally {
       setSaving(false);
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="animate-spin text-[#1e3a5f]" size={32} />
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Configura√ß√µes</h1>
-        <p className="text-sm text-gray-500">Gerencie as informa√ß√µes da sua loja e acessos.</p>
+    <div className="content">
+      <style jsx>{`
+        .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; }
+        .title { font-family:"Orbitron",monospace; font-size:26px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--text-primary); }
+        .title span { color:var(--accent-cyan); }
+        .sub { font-family:"Share Tech Mono",monospace; font-size:11px; color:var(--text-muted); letter-spacing:2px; margin-top:6px; }
+        .btn-main { display:flex; align-items:center; gap:8px; padding:12px 20px; background:linear-gradient(135deg,var(--accent-cyan),var(--accent-blue)); border:none; color:var(--bg-void); font-family:"Orbitron",monospace; font-size:11px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; }
+        .tabs { display:flex; gap:8px; margin-bottom:16px; }
+        .tab { padding:10px 16px; font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; border:1px solid var(--border-dim); color:var(--text-muted); background:var(--bg-card); cursor:pointer; }
+        .tab.active { border-color:var(--accent-cyan); color:var(--accent-cyan); background:rgba(0,229,255,0.06); }
+        .panel { background:var(--bg-card); border:1px solid var(--border-dim); padding:18px 20px; animation:fade 0.3s ease both; }
+        .panel h3 { font-family:"Orbitron",monospace; font-size:14px; letter-spacing:2px; text-transform:uppercase; color:var(--accent-cyan); margin-bottom:6px; }
+        .panel p { font-family:"Share Tech Mono",monospace; font-size:10px; color:var(--text-muted); letter-spacing:1px; }
+        .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; margin-top:14px; }
+        .field { background:var(--bg-card2); border:1px solid var(--border-dim); padding:12px; display:flex; flex-direction:column; gap:6px; }
+        .label { font-family:"Share Tech Mono",monospace; font-size:9px; color:var(--text-muted); letter-spacing:2px; text-transform:uppercase; }
+        .input { width:100%; padding:10px 12px; background:rgba(0,0,0,0.15); border:1px solid var(--border-dim); color:var(--text-primary); font-family:"Rajdhani",sans-serif; font-size:14px; outline:none; }
+        .input:focus { border-color:var(--accent-cyan); box-shadow:0 0 10px rgba(0,229,255,0.15); }
+        .row { display:flex; flex-direction:column; gap:8px; }
+        .actions { margin-top:14px; display:flex; justify-content:flex-end; gap:10px; }
+        .btn-ghost { padding:10px 14px; border:1px solid var(--border-dim); background:transparent; color:var(--text-muted); font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; }
+        .btn-ghost:hover { border-color:var(--accent-cyan); color:var(--accent-cyan); }
+        .progress { display:flex; align-items:center; gap:14px; background:var(--bg-card); border:1px solid var(--border-dim); padding:12px 14px; margin-bottom:12px; }
+        .progress-track { flex:1; height:3px; background:rgba(255,255,255,0.05); }
+        .progress-fill { height:100%; background:linear-gradient(90deg,var(--accent-cyan),var(--accent-green)); box-shadow:0 0 10px var(--accent-cyan); }
+        .progress-label { font-family:"Share Tech Mono",monospace; font-size:9px; color:var(--text-muted); letter-spacing:3px; }
+        .progress-val { font-family:"Orbitron",monospace; font-size:11px; color:var(--accent-cyan); letter-spacing:1px; }
+        .placeholder-box { padding:20px; border:1px dashed var(--border-dim); text-align:center; color:var(--text-muted); font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:2px; }
+        .warn-box { display:flex; gap:10px; padding:12px; background:rgba(255,214,0,0.07); border:1px solid rgba(255,214,0,0.4); color:var(--accent-gold); font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:1px; }
+        @keyframes fade { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
+        @media(max-width:900px){ .header{flex-direction:column;gap:10px;} .btn-main{width:100%;justify-content:center;} }
+      `}</style>
+
+      <div className="header">
+        <div>
+          <div className="title">ConfiguraÁıes</div>
+          <div className="sub">// Gerencie informaÁıes da loja e acessos</div>
+        </div>
+        <button className="btn-main" onClick={handleSave} disabled={saving}>
+          {saving ? "SALVANDO..." : "SALVAR"}
+        </button>
       </div>
 
-      <Tabs defaultValue="store" className="space-y-6">
-        <TabsList className="bg-white border border-gray-200">
-          <TabsTrigger value="store" className="gap-2">
-            <Store size={16} />
-            Dados da Loja
-          </TabsTrigger>
-          <TabsTrigger value="users" className="gap-2">
-            <User size={16} />
-            Usu√°rios
-          </TabsTrigger>
-          <TabsTrigger value="security" className="gap-2">
-            <Shield size={16} />
-            Seguran√ßa
-          </TabsTrigger>
-        </TabsList>
+      <div className="progress">
+        <span className="progress-label">Campos preenchidos</span>
+        <div className="progress-track"><div className="progress-fill" style={{width:`${filledPct.pct}%`}}></div></div>
+        <span className="progress-val">{filledPct.filled} / 5</span>
+      </div>
 
-        <TabsContent value="store">
-          <Card>
-            <CardHeader>
-              <CardTitle>Perfil da Loja</CardTitle>
-              <CardDescription>Estas informa√ß√µes aparecem no rodap√© e p√°ginas de contato.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="store_name">Nome da Loja</Label>
-                  <Input 
-                    id="store_name" 
-                    value={storeSettings.store_name} 
-                    onChange={(e) => setStoreSettings({...storeSettings, store_name: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-mail de Contato</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                    <Input 
-                      id="email" 
-                      className="pl-10"
-                      value={storeSettings.contact_email} 
-                      onChange={(e) => setStoreSettings({...storeSettings, contact_email: e.target.value})}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Telefone / WhatsApp</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                    <Input 
-                      id="phone" 
-                      className="pl-10"
-                      value={storeSettings.contact_phone} 
-                      onChange={(e) => setStoreSettings({...storeSettings, contact_phone: e.target.value})}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="instagram">Instagram (URL)</Label>
-                  <div className="relative">
-                    <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                    <Input 
-                      id="instagram" 
-                      className="pl-10"
-                      placeholder="https://instagram.com/sualoja"
-                      value={storeSettings.instagram_url} 
-                      onChange={(e) => setStoreSettings({...storeSettings, instagram_url: e.target.value})}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="address">Endere√ßo F√≠sico (Opcional)</Label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                  <Input 
-                    id="address" 
-                    className="pl-10"
-                    value={storeSettings.address} 
-                    onChange={(e) => setStoreSettings({...storeSettings, address: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Button 
-                  onClick={handleSaveStore} 
-                  disabled={saving}
-                  className="bg-[#1e3a5f] hover:bg-[#162a45] gap-2"
-                >
-                  {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                  Salvar Altera√ß√µes
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+      <div className="tabs">
+        <button className={`tab ${tab==="store"?"active":""}`} onClick={()=>setTab("store")}>Dados da Loja</button>
+        <button className={`tab ${tab==="users"?"active":""}`} onClick={()=>setTab("users")}>Usu·rios</button>
+        <button className={`tab ${tab==="security"?"active":""}`} onClick={()=>setTab("security")}>SeguranÁa</button>
+      </div>
 
-        <TabsContent value="users">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gest√£o de Usu√°rios</CardTitle>
-              <CardDescription>Controle quem tem acesso ao painel administrativo.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-10 border-2 border-dashed border-gray-200 rounded-lg">
-                <User className="mx-auto text-gray-300 mb-4" size={48} />
-                <h3 className="font-medium text-gray-900">M√≥dulo de Usu√°rios</h3>
-                <p className="text-sm text-gray-500 max-w-xs mx-auto mt-2">
-                  A gest√£o de m√∫ltiplos administradores requer configura√ß√£o de convites por e-mail.
-                </p>
-                <Button variant="outline" className="mt-4" disabled>
-                  Convidar Novo Admin
-                </Button>
+      {loading ? (
+        <div className="panel">Carregando...</div>
+      ) : (
+        <>
+          {tab === "store" && (
+            <div className="panel" key="store">
+              <h3>Perfil da Loja</h3>
+              <p>Estas informaÁıes aparecem no rodapÈ e p·ginas de contato.</p>
+              <div className="grid" style={{marginTop:12}}>
+                <div className="field">
+                  <span className="label">Nome da Loja</span>
+                  <input className="input" value={settings.store_name} onChange={(e)=>setSettings({...settings, store_name:e.target.value})} />
+                </div>
+                <div className="field">
+                  <span className="label">E-mail de Contato</span>
+                  <input className="input" value={settings.contact_email} onChange={(e)=>setSettings({...settings, contact_email:e.target.value})} placeholder="contato@pbimports.com" />
+                </div>
+                <div className="field">
+                  <span className="label">Telefone / WhatsApp</span>
+                  <input className="input" value={settings.contact_phone} onChange={(e)=>setSettings({...settings, contact_phone:e.target.value})} placeholder="(11) 99999-9999" />
+                </div>
+                <div className="field">
+                  <span className="label">Instagram (URL)</span>
+                  <input className="input" value={settings.instagram_url} onChange={(e)=>setSettings({...settings, instagram_url:e.target.value})} placeholder="https://instagram.com/sualoja" />
+                </div>
+                <div className="field" style={{gridColumn:"1 / -1"}}>
+                  <span className="label">EndereÁo FÌsico (Opcional)</span>
+                  <input className="input" value={settings.address} onChange={(e)=>setSettings({...settings, address:e.target.value})} placeholder="Rua, n˙mero, cidade" />
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <div className="actions">
+                <button className="btn-ghost" onClick={fetchSettings}>Recarregar</button>
+                <button className="btn-main" onClick={handleSave} disabled={saving}>{saving?"Salvando...":"Salvar AlteraÁıes"}</button>
+              </div>
+              <div className="sub" style={{marginTop:8}}>{lastSaved}</div>
+            </div>
+          )}
 
-        <TabsContent value="security">
-          <Card>
-            <CardHeader>
-              <CardTitle>Seguran√ßa da Conta</CardTitle>
-              <CardDescription>Altere sua senha e gerencie sess√µes ativas.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex gap-3">
-                <Shield className="text-amber-600 shrink-0" size={20} />
-                <p className="text-sm text-amber-800">
-                  Para sua seguran√ßa, altera√ß√µes de senha devem ser feitas atrav√©s do fluxo de "Esqueci minha senha" na tela de login.
-                </p>
+          {tab === "users" && (
+            <div className="panel" key="users">
+              <h3>Gest„o de Usu·rios</h3>
+              <p>MÛdulo de convites e permissıes ser· habilitado em breve.</p>
+              <div className="placeholder-box" style={{marginTop:12}}>
+                // Em breve: convites por e-mail e papÈis de acesso
               </div>
-              <Button variant="outline" className="w-full text-red-600 border-red-200 hover:bg-red-50">
-                Encerrar todas as sess√µes
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          )}
+
+          {tab === "security" && (
+            <div className="panel" key="security">
+              <h3>SeguranÁa da Conta</h3>
+              <p>Gerencie sessıes e redefiniÁ„o de senha.</p>
+              <div className="warn-box" style={{marginTop:12}}>
+                <Shield size={16} />
+                Para maior seguranÁa, altere a senha via fluxo "Esqueci minha senha" na tela de login.
+              </div>
+              <div className="actions" style={{justifyContent:"flex-start"}}>
+                <button className="btn-ghost" style={{color:"var(--accent-red)",borderColor:"var(--border-dim)"}} onClick={()=>toast.info("Encerramento de sessıes ser· implementado.")}>
+                  Encerrar todas as sessıes
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
