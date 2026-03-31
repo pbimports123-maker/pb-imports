@@ -1,89 +1,82 @@
+
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { 
-  LayoutDashboard, 
-  Package, 
-  Boxes, 
-  Truck, 
-  Tags, 
-  BarChart3, 
-  Settings, 
-  LogOut,
-  Sparkles,
-  ScrollText
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { usePathname } from "next/navigation";
+import { LogOut } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
-const MENU_ITEMS = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/admin" },
-  { icon: Package, label: "Produtos", href: "/admin/products" },
-  { icon: Boxes, label: "Estoque", href: "/admin/stock" },
-  { icon: Truck, label: "Fretes", href: "/admin/shipping" },
-  { icon: ScrollText, label: "Regras", href: "/admin/rules" },
-  { icon: Tags, label: "Categorias", href: "/admin/categories" },
-  { icon: BarChart3, label: "Relatórios", href: "/admin/reports" },
-  { icon: Settings, label: "Configurações", href: "/admin/settings" },
+type MenuItem = { label: string; href: string; icon: string };
+
+const MENU_ITEMS: MenuItem[] = [
+  { label: "Dashboard", href: "/admin", icon: "◈" },
+  { label: "Produtos", href: "/admin/products", icon: "◉" },
+  { label: "Estoque", href: "/admin/stock", icon: "⬡" },
+  { label: "Fretes", href: "/admin/shipping", icon: "⟁" },
+  { label: "Regras", href: "/admin/rules", icon: "⊛" },
+  { label: "Categorias", href: "/admin/categories", icon: "⊞" },
+  { label: "Relatórios", href: "/admin/reports", icon: "⌬" },
+  { label: "Configurações", href: "/admin/settings", icon: "⚙" },
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
 
   const handleLogout = async () => {
     try {
       await signOut();
       toast.success("Sessão encerrada com sucesso!");
-      router.push("/login");
     } catch (error) {
       toast.error("Erro ao sair do sistema.");
     }
   };
 
   return (
-    <aside className="w-64 bg-[#1f2937] text-white flex flex-col h-screen sticky top-0">
-      <div className="p-6 border-b border-gray-700">
-        <div className="flex flex-col leading-none">
-          <div className="flex items-center gap-1">
-            <span className="text-2xl font-black text-white tracking-tighter">PB</span>
-            <Sparkles className="w-4 h-4 text-[#fbbf24] fill-[#fbbf24]" />
+    <aside className="sidebar">
+      <div className="sidebar-logo">
+        <div className="logo-badge">
+          <div className="logo-hex">
+            <span>PB</span>
           </div>
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">admin panel</span>
+          <div className="logo-text">
+            <span className="logo-name">PB+</span>
+            <span className="logo-sub">Admin Panel</span>
+          </div>
         </div>
       </div>
 
-      <nav className="flex-grow p-4 space-y-1">
+      <nav className="nav-section">
+        <div className="nav-label">// Sistema</div>
         {MENU_ITEMS.map((item) => {
-          const isActive = pathname === item.href;
+          const active = pathname === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-sm font-medium",
-                isActive 
-                  ? "bg-[#1e3a5f] text-white" 
-                  : "text-gray-400 hover:bg-gray-800 hover:text-white"
-              )}
+              className={cn("nav-item", active && "active")}
             >
-              <item.icon size={20} />
+              <span className="nav-icon">{item.icon}</span>
               {item.label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-700">
-        <button 
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-3 w-full text-left text-gray-400 hover:text-red-400 transition-colors text-sm font-medium"
-        >
-          <LogOut size={20} />
-          Sair do Painel
+      <div className="nav-bottom">
+        <button className="user-exit" onClick={handleLogout}>
+          <div className="user-avatar">
+            {user?.email?.[0]?.toUpperCase() || "A"}
+          </div>
+          <div className="user-info">
+            <span className="user-name">{user?.email || "admin"}</span>
+            <span className="user-role">Super Admin</span>
+          </div>
+          <span className="exit-icon">
+            <LogOut size={16} />
+          </span>
         </button>
       </div>
     </aside>
