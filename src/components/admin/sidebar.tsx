@@ -1,5 +1,4 @@
-
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -13,9 +12,9 @@ type MenuItem = { label: string; href: string; icon: string };
 const MENU_ITEMS: MenuItem[] = [
   { label: "Dashboard", href: "/admin", icon: "◈" },
   { label: "Produtos", href: "/admin/products", icon: "◉" },
-  { label: "Estoque", href: "/admin/stock", icon: "⬡" },
   { label: "Fretes", href: "/admin/shipping", icon: "⟁" },
   { label: "Regras", href: "/admin/rules", icon: "⊛" },
+  { label: "Curiosidades", href: "/admin/curiosidades", icon: "✦" },
   { label: "Categorias", href: "/admin/categories", icon: "⊞" },
   { label: "Relatórios", href: "/admin/reports", icon: "⌬" },
   { label: "Configurações", href: "/admin/settings", icon: "⚙" },
@@ -53,11 +52,7 @@ export function AdminSidebar() {
         {MENU_ITEMS.map((item) => {
           const active = pathname === item.href;
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn("nav-item", active && "active")}
-            >
+            <Link key={item.href} href={item.href} className={cn("nav-item", active && "active")}>
               <span className="nav-icon">{item.icon}</span>
               {item.label}
             </Link>
@@ -67,9 +62,7 @@ export function AdminSidebar() {
 
       <div className="nav-bottom">
         <button className="user-exit" onClick={handleLogout}>
-          <div className="user-avatar">
-            {user?.email?.[0]?.toUpperCase() || "A"}
-          </div>
+          <div className="user-avatar">{user?.email?.[0]?.toUpperCase() || "A"}</div>
           <div className="user-info">
             <span className="user-name">{user?.email || "admin"}</span>
             <span className="user-role">Super Admin</span>

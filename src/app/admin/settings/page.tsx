@@ -1,8 +1,10 @@
-"use client";
+ï»¿"use client";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Shield } from "lucide-react";
+import UsersTab from "./users-tab";
+import SecurityTab from "./security-tab";
 
 type StoreSettings = {
   id?: string;
@@ -26,30 +28,32 @@ export default function AdminSettingsPage() {
   const [tab, setTab] = useState<TabKey>("store");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<string>("// Nenhuma alteração salva");
+  const [lastSaved, setLastSaved] = useState<string>("Nenhuma alteraÃ§Ã£o salva");
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
+  useEffect(() => { fetchSettings(); }, []);
 
   async function fetchSettings() {
     try {
       setLoading(true);
       const { data, error } = await supabase.from("store_settings").select("*").maybeSingle();
       if (error) throw error;
-      if (data) setSettings(data as StoreSettings);
+      if (data) setSettings({
+        store_name: data.store_name ?? "",
+        contact_email: data.contact_email ?? "",
+        contact_phone: data.contact_phone ?? "",
+        address: data.address ?? "",
+        instagram_url: data.instagram_url ?? "",
+        id: data.id,
+      });
     } catch (err: any) {
-      toast.error("Erro ao carregar configurações: " + err.message);
-    } finally {
-      setLoading(false);
-    }
+      toast.error("Erro ao carregar configuraÃ§Ãµes: " + err.message);
+    } finally { setLoading(false); }
   }
 
   const filledPct = useMemo(() => {
-    const total = 5; // fields we track
-    const filled = [settings.store_name, settings.contact_email, settings.contact_phone, settings.address, settings.instagram_url].filter(
-      (v) => v && v.trim().length > 0
-    ).length;
+    const total = 5;
+    const filled = [settings.store_name, settings.contact_email, settings.contact_phone, settings.address, settings.instagram_url]
+      .filter(v => v && v.trim().length > 0).length;
     return { filled, pct: Math.round((filled / total) * 100) };
   }, [settings]);
 
@@ -58,139 +62,151 @@ export default function AdminSettingsPage() {
       setSaving(true);
       const payload = { ...settings } as any;
       if (!payload.id) delete payload.id;
-      const { error } = await supabase.from("store_settings").upsert({
-        ...payload,
-        updated_at: new Date().toISOString(),
-      });
+      const { error } = await supabase.from("store_settings").upsert({ ...payload, updated_at: new Date().toISOString() });
       if (error) throw error;
-      const stamp = new Date().toLocaleString("pt-BR");
-      setLastSaved(`// Salvo em ${stamp}`);
-      toast.success("Configurações atualizadas!");
+      setLastSaved(`Salvo em ${new Date().toLocaleString("pt-BR")}`);
+      toast.success("ConfiguraÃ§Ãµes atualizadas!");
       fetchSettings();
     } catch (err: any) {
       toast.error("Erro ao salvar: " + err.message);
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   }
 
   return (
     <div className="content">
       <style jsx>{`
-        .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; }
-        .title { font-family:"Orbitron",monospace; font-size:26px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--text-primary); }
-        .title span { color:var(--accent-cyan); }
-        .sub { font-family:"Share Tech Mono",monospace; font-size:11px; color:var(--text-muted); letter-spacing:2px; margin-top:6px; }
-        .btn-main { display:flex; align-items:center; gap:8px; padding:12px 20px; background:linear-gradient(135deg,var(--accent-cyan),var(--accent-blue)); border:none; color:var(--bg-void); font-family:"Orbitron",monospace; font-size:11px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; }
-        .tabs { display:flex; gap:8px; margin-bottom:16px; }
-        .tab { padding:10px 16px; font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; border:1px solid var(--border-dim); color:var(--text-muted); background:var(--bg-card); cursor:pointer; }
-        .tab.active { border-color:var(--accent-cyan); color:var(--accent-cyan); background:rgba(0,229,255,0.06); }
-        .panel { background:var(--bg-card); border:1px solid var(--border-dim); padding:18px 20px; animation:fade 0.3s ease both; }
-        .panel h3 { font-family:"Orbitron",monospace; font-size:14px; letter-spacing:2px; text-transform:uppercase; color:var(--accent-cyan); margin-bottom:6px; }
-        .panel p { font-family:"Share Tech Mono",monospace; font-size:10px; color:var(--text-muted); letter-spacing:1px; }
-        .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; margin-top:14px; }
-        .field { background:var(--bg-card2); border:1px solid var(--border-dim); padding:12px; display:flex; flex-direction:column; gap:6px; }
-        .label { font-family:"Share Tech Mono",monospace; font-size:9px; color:var(--text-muted); letter-spacing:2px; text-transform:uppercase; }
-        .input { width:100%; padding:10px 12px; background:rgba(0,0,0,0.15); border:1px solid var(--border-dim); color:var(--text-primary); font-family:"Rajdhani",sans-serif; font-size:14px; outline:none; }
-        .input:focus { border-color:var(--accent-cyan); box-shadow:0 0 10px rgba(0,229,255,0.15); }
-        .row { display:flex; flex-direction:column; gap:8px; }
-        .actions { margin-top:14px; display:flex; justify-content:flex-end; gap:10px; }
-        .btn-ghost { padding:10px 14px; border:1px solid var(--border-dim); background:transparent; color:var(--text-muted); font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; }
-        .btn-ghost:hover { border-color:var(--accent-cyan); color:var(--accent-cyan); }
-        .progress { display:flex; align-items:center; gap:14px; background:var(--bg-card); border:1px solid var(--border-dim); padding:12px 14px; margin-bottom:12px; }
-        .progress-track { flex:1; height:3px; background:rgba(255,255,255,0.05); }
-        .progress-fill { height:100%; background:linear-gradient(90deg,var(--accent-cyan),var(--accent-green)); box-shadow:0 0 10px var(--accent-cyan); }
-        .progress-label { font-family:"Share Tech Mono",monospace; font-size:9px; color:var(--text-muted); letter-spacing:3px; }
-        .progress-val { font-family:"Orbitron",monospace; font-size:11px; color:var(--accent-cyan); letter-spacing:1px; }
-        .placeholder-box { padding:20px; border:1px dashed var(--border-dim); text-align:center; color:var(--text-muted); font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:2px; }
-        .warn-box { display:flex; gap:10px; padding:12px; background:rgba(255,214,0,0.07); border:1px solid rgba(255,214,0,0.4); color:var(--accent-gold); font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:1px; }
-        @keyframes fade { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
-        @media(max-width:900px){ .header{flex-direction:column;gap:10px;} .btn-main{width:100%;justify-content:center;} }
+        /* Header */
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+        .title { font-family: "Raleway", sans-serif; font-size: 26px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-primary); }
+        .title span { color: var(--accent-terra); }
+        .sub { font-family: "DM Sans", sans-serif; font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+        .btn-main { display: flex; align-items: center; gap: 8px; padding: 12px 22px; background: var(--accent-terra); border: none; color: #fff; font-family: "Raleway", sans-serif; font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .btn-main:hover { background: var(--accent-terra-dark); transform: translateY(-1px); }
+        .btn-main:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        /* Progresso */
+        .progress { display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; }
+        .progress-label { font-size: 12px; color: var(--text-muted); font-weight: 500; white-space: nowrap; }
+        .progress-track { flex: 1; height: 4px; background: rgba(194,130,102,0.12); border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent-terra), #7AAF90); border-radius: 4px; transition: width 0.4s ease; }
+        .progress-val { font-family: "Raleway", sans-serif; font-size: 13px; font-weight: 700; color: var(--accent-terra); white-space: nowrap; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+        .tab { padding: 10px 18px; font-family: "Raleway", sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; border: 1px solid rgba(194,130,102,0.2); border-radius: 8px; color: var(--text-muted); background: #fff; cursor: pointer; transition: all 0.2s; }
+        .tab:hover { border-color: var(--accent-terra); color: var(--accent-terra); }
+        .tab.active { border-color: var(--accent-terra); color: var(--accent-terra); background: rgba(194,130,102,0.06); }
+
+        /* Panel */
+        .panel { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 12px; padding: 24px; animation: fade 0.3s ease both; }
+        .panel h3 { font-family: "Raleway", sans-serif; font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 5px; }
+        .panel p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+        /* Grid de campos */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 18px; }
+        .field { display: flex; flex-direction: column; gap: 6px; }
+        .label { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase; }
+        .input { width: 100%; padding: 11px 14px; background: #FAF8EF; border: 1px solid rgba(194,130,102,0.25); border-radius: 8px; color: var(--text-primary); font-family: "DM Sans", sans-serif; font-size: 14px; outline: none; transition: all 0.2s; }
+        .input::placeholder { color: #C8B8AE; }
+        .input:focus { border-color: var(--accent-terra); box-shadow: 0 0 0 3px rgba(194,130,102,0.12); }
+
+        /* AÃ§Ãµes */
+        .actions { margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
+        .btn-ghost { padding: 10px 18px; border: 1px solid rgba(194,130,102,0.25); border-radius: 8px; background: transparent; color: var(--text-muted); font-family: "Raleway", sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-ghost:hover { border-color: var(--accent-terra); color: var(--accent-terra); }
+        .last-saved { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+
+        /* Placeholder */
+        .placeholder-box { margin-top: 16px; padding: 24px; border: 1.5px dashed rgba(194,130,102,0.25); border-radius: 10px; text-align: center; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+
+        /* Aviso seguranÃ§a */
+        .warn-box { display: flex; gap: 12px; padding: 14px 16px; background: rgba(212,169,106,0.08); border: 1px solid rgba(212,169,106,0.3); border-radius: 10px; color: #8A6830; font-size: 13px; line-height: 1.5; margin-top: 16px; }
+        .btn-danger { padding: 10px 18px; border: 1px solid rgba(192,97,79,0.3); border-radius: 8px; background: transparent; color: #C0614F; font-family: "Raleway", sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-danger:hover { background: rgba(192,97,79,0.06); border-color: #C0614F; }
+
+        @keyframes fade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 900px) { .header { flex-direction: column; gap: 10px; } .btn-main { width: 100%; justify-content: center; } }
       `}</style>
 
+      {/* Header */}
       <div className="header">
         <div>
-          <div className="title">Configurações</div>
-          <div className="sub">// Gerencie informações da loja e acessos</div>
+          <div className="title">ConfiguraÃ§Ãµes</div>
+          <div className="sub">Gerencie informaÃ§Ãµes da loja e acessos</div>
         </div>
         <button className="btn-main" onClick={handleSave} disabled={saving}>
-          {saving ? "SALVANDO..." : "SALVAR"}
+          {saving ? "Salvando..." : "Salvar"}
         </button>
       </div>
 
+      {/* Progresso */}
       <div className="progress">
         <span className="progress-label">Campos preenchidos</span>
-        <div className="progress-track"><div className="progress-fill" style={{width:`${filledPct.pct}%`}}></div></div>
+        <div className="progress-track">
+          <div className="progress-fill" style={{ width: `${filledPct.pct}%` }} />
+        </div>
         <span className="progress-val">{filledPct.filled} / 5</span>
       </div>
 
+      {/* Tabs */}
       <div className="tabs">
-        <button className={`tab ${tab==="store"?"active":""}`} onClick={()=>setTab("store")}>Dados da Loja</button>
-        <button className={`tab ${tab==="users"?"active":""}`} onClick={()=>setTab("users")}>Usuários</button>
-        <button className={`tab ${tab==="security"?"active":""}`} onClick={()=>setTab("security")}>Segurança</button>
+        <button className={`tab ${tab === "store" ? "active" : ""}`} onClick={() => setTab("store")}>Dados da Loja</button>
+        <button className={`tab ${tab === "users" ? "active" : ""}`} onClick={() => setTab("users")}>UsuÃ¡rios</button>
+        <button className={`tab ${tab === "security" ? "active" : ""}`} onClick={() => setTab("security")}>SeguranÃ§a</button>
       </div>
 
       {loading ? (
-        <div className="panel">Carregando...</div>
+        <div className="panel" style={{ color: "var(--text-muted)", fontSize: 14 }}>Carregando...</div>
       ) : (
         <>
+          {/* Dados da Loja */}
           {tab === "store" && (
             <div className="panel" key="store">
               <h3>Perfil da Loja</h3>
-              <p>Estas informações aparecem no rodapé e páginas de contato.</p>
-              <div className="grid" style={{marginTop:12}}>
+              <p>Estas informaÃ§Ãµes aparecem no rodapÃ© e pÃ¡ginas de contato.</p>
+              <div className="grid">
                 <div className="field">
                   <span className="label">Nome da Loja</span>
-                  <input className="input" value={settings.store_name} onChange={(e)=>setSettings({...settings, store_name:e.target.value})} />
+                  <input className="input" value={settings.store_name} onChange={e => setSettings({ ...settings, store_name: e.target.value })} />
                 </div>
                 <div className="field">
                   <span className="label">E-mail de Contato</span>
-                  <input className="input" value={settings.contact_email} onChange={(e)=>setSettings({...settings, contact_email:e.target.value})} placeholder="contato@pbimports.com" />
+                  <input className="input" value={settings.contact_email} onChange={e => setSettings({ ...settings, contact_email: e.target.value })} placeholder="contato@pbimports.com" />
                 </div>
                 <div className="field">
                   <span className="label">Telefone / WhatsApp</span>
-                  <input className="input" value={settings.contact_phone} onChange={(e)=>setSettings({...settings, contact_phone:e.target.value})} placeholder="(11) 99999-9999" />
+                  <input className="input" value={settings.contact_phone} onChange={e => setSettings({ ...settings, contact_phone: e.target.value })} placeholder="(11) 99999-9999" />
                 </div>
                 <div className="field">
                   <span className="label">Instagram (URL)</span>
-                  <input className="input" value={settings.instagram_url} onChange={(e)=>setSettings({...settings, instagram_url:e.target.value})} placeholder="https://instagram.com/sualoja" />
+                  <input className="input" value={settings.instagram_url} onChange={e => setSettings({ ...settings, instagram_url: e.target.value })} placeholder="https://instagram.com/sualoja" />
                 </div>
-                <div className="field" style={{gridColumn:"1 / -1"}}>
-                  <span className="label">Endereço Físico (Opcional)</span>
-                  <input className="input" value={settings.address} onChange={(e)=>setSettings({...settings, address:e.target.value})} placeholder="Rua, número, cidade" />
+                <div className="field" style={{ gridColumn: "1 / -1" }}>
+                  <span className="label">EndereÃ§o FÃ­sico (Opcional)</span>
+                  <input className="input" value={settings.address} onChange={e => setSettings({ ...settings, address: e.target.value })} placeholder="Rua, nÃºmero, cidade" />
                 </div>
               </div>
               <div className="actions">
                 <button className="btn-ghost" onClick={fetchSettings}>Recarregar</button>
-                <button className="btn-main" onClick={handleSave} disabled={saving}>{saving?"Salvando...":"Salvar Alterações"}</button>
-              </div>
-              <div className="sub" style={{marginTop:8}}>{lastSaved}</div>
-            </div>
-          )}
-
-          {tab === "users" && (
-            <div className="panel" key="users">
-              <h3>Gestão de Usuários</h3>
-              <p>Módulo de convites e permissões será habilitado em breve.</p>
-              <div className="placeholder-box" style={{marginTop:12}}>
-                // Em breve: convites por e-mail e papéis de acesso
-              </div>
-            </div>
-          )}
-
-          {tab === "security" && (
-            <div className="panel" key="security">
-              <h3>Segurança da Conta</h3>
-              <p>Gerencie sessões e redefinição de senha.</p>
-              <div className="warn-box" style={{marginTop:12}}>
-                <Shield size={16} />
-                Para maior segurança, altere a senha via fluxo "Esqueci minha senha" na tela de login.
-              </div>
-              <div className="actions" style={{justifyContent:"flex-start"}}>
-                <button className="btn-ghost" style={{color:"var(--accent-red)",borderColor:"var(--border-dim)"}} onClick={()=>toast.info("Encerramento de sessões será implementado.")}>
-                  Encerrar todas as sessões
+                <button className="btn-main" onClick={handleSave} disabled={saving}>
+                  {saving ? "Salvando..." : "Salvar AlteraÃ§Ãµes"}
                 </button>
               </div>
+              <div className="last-saved">{lastSaved}</div>
+            </div>
+          )}
+
+          {/* UsuÃ¡rios */}
+          {tab === "users" && (
+            <div className="panel" key="users">
+              <UsersTab />
+            </div>
+          )}
+
+          {/* SeguranÃ§a */}
+          {tab === "security" && (
+            <div className="panel" key="security">
+              <SecurityTab />
             </div>
           )}
         </>

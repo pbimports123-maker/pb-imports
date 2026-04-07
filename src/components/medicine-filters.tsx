@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { CATEGORIES } from "@/lib/mock-data";
 import { Label } from "@/components/ui/label";
@@ -28,11 +28,11 @@ export function MedicineFilters({
   onReset
 }: FiltersProps) {
   
-  const toggleCategory = (category: string) => {
-    if (selectedCategories.includes(category)) {
-      setSelectedCategories(selectedCategories.filter(c => c !== category));
+  const toggleCategory = (categoryId: string) => {
+    if (selectedCategories.includes(categoryId)) {
+      setSelectedCategories(selectedCategories.filter(c => c !== categoryId));
     } else {
-      setSelectedCategories([...selectedCategories, category]);
+      setSelectedCategories([...selectedCategories, categoryId]);
     }
   };
 
@@ -42,14 +42,14 @@ export function MedicineFilters({
         <h3 className="font-bold mb-4">Categorias</h3>
         <div className="space-y-3">
           {CATEGORIES.map((cat) => (
-            <div key={cat} className="flex items-center space-x-2">
+            <div key={cat.id} className="flex items-center space-x-2">
               <Checkbox 
-                id={`cat-${cat}`} 
-                checked={selectedCategories.includes(cat)}
-                onCheckedChange={() => toggleCategory(cat)}
+                id={`cat-${cat.id}`} 
+                checked={selectedCategories.includes(cat.id)}
+                onCheckedChange={() => toggleCategory(cat.id)}
               />
-              <Label htmlFor={`cat-${cat}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                {cat}
+              <Label htmlFor={`cat-${cat.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                {cat.name}
               </Label>
             </div>
           ))}
@@ -60,7 +60,7 @@ export function MedicineFilters({
 
       <div>
         <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold">Preço Máximo</h3>
+          <h3 className="font-bold">PreÃ§o MÃ¡ximo</h3>
           <span className="text-sm font-bold text-primary">R$ {priceRange[1]}</span>
         </div>
         <Slider
@@ -93,3 +93,4 @@ export function MedicineFilters({
     </div>
   );
 }
+

@@ -19,9 +19,7 @@ export default function AdminCuriosidadesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    fetchItems();
-  }, []);
+  useEffect(() => { fetchItems(); }, []);
 
   async function fetchItems() {
     try {
@@ -46,12 +44,7 @@ export default function AdminCuriosidadesPage() {
     }
     try {
       setSaving(true);
-      const { error } = await supabase.from("curiosities").insert([
-        {
-          title: title.trim(),
-          content: content.trim(),
-        },
-      ]);
+      const { error } = await supabase.from("curiosities").insert([{ title: title.trim(), content: content.trim() }]);
       if (error) throw error;
       toast.success("Curiosidade adicionada!");
       setTitle("");
@@ -74,100 +67,130 @@ export default function AdminCuriosidadesPage() {
       toast.success("Curiosidade removida.");
     } catch (err: any) {
       toast.error("Erro ao remover: " + err.message);
-      setItems(prev); // rollback
+      setItems(prev);
     }
   }
 
   return (
-    <div className="min-h-screen bg-[#0b0f17] text-white p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <header className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-[#111826] border border-[#1f2937] flex items-center justify-center">
-              <Sparkles className="text-[#22d3ee]" size={22} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold">Curiosidades</h1>
-              <p className="text-sm text-[#9ca3af]">Publique dicas rápidas que aparecerão na área pública.</p>
-            </div>
-          </div>
-        </header>
+    <div className="cur-root">
+      <style jsx>{`
+        .cur-root { padding: 0; }
 
-        <div className="grid gap-4 bg-[#0f131c] border border-[#1f2937] rounded-2xl p-5">
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <label className="text-xs uppercase tracking-[0.2em] text-[#9ca3af]">Título</label>
-              <input
-                className="w-full bg-[#0b1018] border border-[#1f2937] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#22d3ee]"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Como escolher o frete certo"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-xs uppercase tracking-[0.2em] text-[#9ca3af]">Conteúdo</label>
-              <textarea
-                className="w-full bg-[#0b1018] border border-[#1f2937] rounded-lg px-3 py-2 text-sm text-white h-28 resize-vertical focus:outline-none focus:border-[#22d3ee]"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Texto curto, pode usar quebras de linha"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-[#22d3ee] to-[#8b5cf6] text-[#0b0f15] font-semibold text-sm disabled:opacity-60"
-            >
-              {saving ? <Loader2 className="animate-spin" size={16} /> : <PlusCircle size={16} />}
-              Salvar curiosidade
-            </button>
-          </div>
+        /* Header */
+        .cur-header { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+        .cur-icon { width: 46px; height: 46px; border-radius: 12px; background: rgba(194,130,102,0.1); border: 1px solid rgba(194,130,102,0.25); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .cur-title { font-family: "Raleway", sans-serif; font-size: 24px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.5px; }
+        .cur-sub { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+
+        /* Form card */
+        .form-card { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 14px; padding: 24px; margin-bottom: 28px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
+        .field { display: flex; flex-direction: column; gap: 6px; }
+        .field label { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase; }
+        .field input, .field textarea {
+          width: 100%; padding: 11px 14px;
+          background: #FAF8EF; border: 1px solid rgba(194,130,102,0.25);
+          border-radius: 8px; color: var(--text-primary);
+          font-family: "DM Sans", sans-serif; font-size: 14px;
+          outline: none; transition: all 0.2s;
+          resize: vertical;
+        }
+        .field input::placeholder, .field textarea::placeholder { color: #C8B8AE; }
+        .field input:focus, .field textarea:focus { border-color: #C28266; box-shadow: 0 0 0 3px rgba(194,130,102,0.12); }
+        .field textarea { min-height: 112px; }
+        .form-footer { display: flex; justify-content: flex-end; }
+        .save-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; background: #C28266; color: #fff; border: none; border-radius: 8px; font-family: "Raleway", sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+        .save-btn:hover { background: #9E6650; transform: translateY(-1px); }
+        .save-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        /* Lista */
+        .list-label { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 14px; }
+        .loading-state { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 14px; }
+        .empty-state { background: #fff; border: 1px solid rgba(194,130,102,0.15); border-radius: 12px; padding: 24px; font-size: 14px; color: var(--text-muted); text-align: center; }
+        .items-grid { display: flex; flex-direction: column; gap: 12px; }
+
+        /* Item card */
+        .item-card { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 12px; padding: 18px 20px; transition: box-shadow 0.2s; }
+        .item-card:hover { box-shadow: 0 4px 20px rgba(194,130,102,0.1); }
+        .item-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+        .item-title { font-family: "Raleway", sans-serif; font-size: 16px; font-weight: 700; color: var(--text-primary); }
+        .item-date { font-size: 11px; color: var(--text-muted); margin-top: 3px; letter-spacing: 0.3px; }
+        .delete-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: transparent; border: 1px solid rgba(192,97,79,0.25); border-radius: 8px; cursor: pointer; color: #C0614F; transition: all 0.2s; flex-shrink: 0; }
+        .delete-btn:hover { background: rgba(192,97,79,0.08); border-color: #C0614F; }
+        .item-content { font-size: 14px; color: var(--text-muted); line-height: 1.6; white-space: pre-wrap; }
+      `}</style>
+
+      {/* Header */}
+      <div className="cur-header">
+        <div className="cur-icon">
+          <Sparkles size={22} color="#C28266" />
         </div>
-
-        <div className="space-y-3">
-          <div className="text-xs uppercase tracking-[0.2em] text-[#9ca3af]">Publicadas</div>
-          {loading ? (
-            <div className="flex items-center gap-2 text-[#9ca3af]">
-              <Loader2 className="animate-spin" size={18} />
-              Carregando...
-            </div>
-          ) : items.length === 0 ? (
-            <div className="rounded-xl border border-[#1f2937] bg-[#0f131c] p-4 text-sm text-[#9ca3af]">
-              Nenhuma curiosidade cadastrada ainda.
-            </div>
-          ) : (
-            <div className="grid gap-3">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-xl border border-[#1f2937] bg-[#0f131c] p-4 flex flex-col gap-2"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-base font-semibold">{item.title}</div>
-                      {item.created_at && (
-                        <div className="text-[11px] uppercase tracking-[0.18em] text-[#9ca3af]">
-                          {new Date(item.created_at).toLocaleString("pt-BR")}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="text-[#f87171] hover:text-red-400 transition-colors"
-                      title="Remover"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                  <p className="text-sm text-[#dfe4ea] whitespace-pre-wrap">{item.content}</p>
-                </div>
-              ))}
-            </div>
-          )}
+        <div>
+          <div className="cur-title">Curiosidades</div>
+          <div className="cur-sub">Publique dicas rápidas que aparecerão na área pública.</div>
         </div>
       </div>
+
+      {/* Formulário */}
+      <div className="form-card">
+        <div className="form-grid">
+          <div className="field">
+            <label>Título</label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ex: Como escolher o frete certo"
+            />
+          </div>
+          <div className="field">
+            <label>Conteúdo</label>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Texto curto, pode usar quebras de linha"
+            />
+          </div>
+        </div>
+        <div className="form-footer">
+          <button className="save-btn" onClick={handleSave} disabled={saving}>
+            {saving ? <Loader2 className="animate-spin" size={16} /> : <PlusCircle size={16} />}
+            Salvar curiosidade
+          </button>
+        </div>
+      </div>
+
+      {/* Lista */}
+      <div className="list-label">Publicadas</div>
+      {loading ? (
+        <div className="loading-state">
+          <Loader2 className="animate-spin" size={18} />
+          Carregando...
+        </div>
+      ) : items.length === 0 ? (
+        <div className="empty-state">Nenhuma curiosidade cadastrada ainda.</div>
+      ) : (
+        <div className="items-grid">
+          {items.map((item) => (
+            <div key={item.id} className="item-card">
+              <div className="item-top">
+                <div>
+                  <div className="item-title">{item.title}</div>
+                  {item.created_at && (
+                    <div className="item-date">
+                      {new Date(item.created_at).toLocaleString("pt-BR")}
+                    </div>
+                  )}
+                </div>
+                <button className="delete-btn" onClick={() => handleDelete(item.id)} title="Remover">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+              <p className="item-content">{item.content}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

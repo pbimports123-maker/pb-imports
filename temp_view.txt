@@ -1,236 +1,40 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  ChevronLeft,
-  CreditCard,
-  Package,
-  Search,
-  Shield,
-  Video,
-  MapPin,
-  CheckCircle,
-  AlertTriangle,
-  Loader2,
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { 
+  ChevronLeft, 
+  Save, 
+  X, 
+  Upload,
+  Info
 } from "lucide-react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  FormDescription,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import Link from "next/link";
+import { toast } from "sonner";
 
-const DEFAULT_RULES: Record<string, string> = {
-  pagamento: [
-    "Pix",
-    "Transferência bancária (TED)",
-    "Depósito direto",
-    "?? Não utilize caixa eletrônico ou DOC",
-    "?? Não insira nome de produtos no comprovante",
-    "Atenção: sempre solicite a conta novamente antes de realizar uma nova compra. A conta pode ser alterada. Caso o pagamento seja feito sem nossa autorização, não nos responsabilizamos.",
-  ].join("\n"),
-  postagem:
-    "A postagem será realizada em até 24 horas após a confirmação do pagamento.",
-  rastreio:
-    "O código de rastreio será fornecido em até 24 horas após a postagem.\nSolicite o código de segunda a sexta-feira, após as 18h.",
-  seguro: [
-    "O seguro é opcional. Consulte o vendedor para mais informações.",
-    "Para que serve o seguro? Caso o pedido seja extraviado ou retido na fiscalização, realizaremos um novo reenvio.",
-    "Observação importante: como os produtos são ilícitos, quando há retenção pela fiscalização ou extravio não há a quem reclamar, e a mercadoria é considerada perdida. Por isso, o seguro é fundamental.",
-  ].join("\n"),
-  recebimento: [
-    "Para sua própria segurança, filme a abertura da caixa. Nosso controle é extremamente rigoroso e tiramos fotos de todos os pedidos antes de embalá-los.",
-    "• O vídeo deve ser 100% nítido",
-    "• A caixa deve estar visível durante toda a filmagem",
-    "• Mostre o conteúdo ao ser retirado da embalagem",
-    "Se a caixa chegar danificada, aberta ou violada — RECUSE A ENTREGA. Caso contrário, não nos responsabilizaremos.",
-  ].join("\n"),
-  endereco:
-    "Se o cliente fornecer um endereço ou CEP incorretos e a encomenda for extraviada ou perdida, não nos responsabilizaremos, mesmo que o seguro tenha sido pago.",
-  credibilidade:
-    "Diferenciais, parcerias e atletas...",
-};
-
-const DEFAULT_RULES: Record<string, string> = {
-  pagamento:
-    "Pix\nTransferência bancária (TED)\nDepósito direto\n?? Não utilize caixa eletrônico ou DOC\n?? Não insira nome de produtos no comprovante\nAtenção: sempre solicite a conta novamente antes de realizar uma nova compra. A conta pode ser alterada. Caso o pagamento seja feito sem nossa autorização, não nos responsabilizamos.",
-  postagem:
-    "A postagem será realizada em até 24 horas após a confirmação do pagamento.",
-  rastreio:
-    "O código de rastreio será fornecido em até 24 horas após a postagem.\nSolicite o código de segunda a sexta-feira, após as 18h.",
-  seguro:
-    "O seguro é opcional. Consulte o vendedor para mais informações.\nPara que serve o seguro? Caso o pedido seja extraviado ou retido na fiscalização, realizaremos um novo reenvio.\nObservação importante: como os produtos são ilícitos, quando há retenção pela fiscalização ou extravio não há a quem reclamar, e a mercadoria é considerada perdida. Por isso, o seguro é fundamental.",
-  recebimento:
-    "Para sua própria segurança, filme a abertura da caixa. Nosso controle é extremamente rigoroso e tiramos fotos de todos os pedidos antes de embalá-los.\n• O vídeo deve ser 100% nítido\n• A caixa deve estar visível durante toda a filmagem\n• Mostre o conteúdo ao ser retirado da embalagem\nSe a caixa chegar danificada, aberta ou violada — RECUSE A ENTREGA. Caso contrário, não nos responsabilizaremos.",
-  endereco:
-    "Se o cliente fornecer um endereço ou CEP incorretos e a encomenda for extraviada ou perdida, não nos responsabilizaremos, mesmo que o seguro tenha sido pago.",
-  credibilidade: "Diferenciais, parcerias e atletas...",
-};
-
-export default function RegrasPage() {
-  const [loading, setLoading] = useState(true);
-  const [rules, setRules] = useState<any>(null);
-
-  useEffect(() => {
-    async function fetchRules() {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('shipping_rules')
-          .select('content')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (error && error.code !== 'PGRST116') throw error;
-        
-        if (data?.content) {
-          setRules(applyDefaults(JSON.parse(data.content)));
-        } else {
-          setRules(DEFAULT_RULES);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar regras:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchRules();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#fbbf24]" size={48} />
-      </div>
-    );
-  }
-
-  const safe = applyDefaults(rules || {});
-
-  return (
-    <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col">
-      <header className="h-16 border-b border-[#404040] flex items-center px-4 sticky top-0 bg-[#1a1a1a] z-50">
-        <Link href="/">
-          <Button variant="ghost" size="icon" className="text-[#9ca3af] hover:text-white">
-            <ChevronLeft size={24} />
-          </Button>
-        </Link>
-        <div className="flex-grow flex justify-center pr-10">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-md bg-[#22d3ee] flex items-center justify-center text-black font-black text-xs">
-              PB
-            </div>
-            <div className="flex flex-col leading-none">
-              <span className="text-sm font-bold tracking-[0.16em] text-[#22d3ee] uppercase">PB IMPORTS</span>
-              <span className="text-[10px] font-semibold text-[#6b7280] tracking-[0.24em] uppercase">Disponibilidade</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8 max-w-[800px] flex flex-col gap-6">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-12 h-12 rounded-lg border border-[#d97706]/30 bg-[#d97706]/10 flex items-center justify-center">
-            <ScrollText className="text-[#d97706]" size={24} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Regras de Envio</h1>
-            <p className="text-sm text-[#9ca3af]">Informações sobre como funciona o envio</p>
-          </div>
-        </div>
-
-        {/* Pagamento */}
-        <section className="bg-[#2d2d2d] border border-[#404040] rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-[#404040] bg-gradient-to-r from-[#10b981]/5 to-transparent flex items-center gap-2">
-            <CreditCard className="text-[#10b981]" size={20} />
-            <h2 className="text-[#10b981] font-bold">Formas de Pagamento</h2>
-          </div>
-          <div className="p-6">
-            <p className="text-sm text-[#e5e7eb] whitespace-pre-wrap">{safe.pagamento}</p>
-          </div>
-        </section>
-
-        {/* Postagem */}
-        <section className="bg-[#2d2d2d] border border-[#404040] rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-[#404040] bg-gradient-to-r from-[#d97706]/5 to-transparent flex items-center gap-2">
-            <Package className="text-[#d97706]" size={20} />
-            <h2 className="text-[#d97706] font-bold">Postagem</h2>
-          </div>
-          <div className="p-6">
-            <p className="text-sm text-[#e5e7eb] whitespace-pre-wrap">{safe.postagem}</p>
-          </div>
-        </section>
-
-        {/* Rastreio */}
-        <section className="bg-[#2d2d2d] border border-[#404040] rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-[#404040] bg-gradient-to-r from-[#3b82f6]/5 to-transparent flex items-center gap-2">
-            <Search className="text-[#3b82f6]" size={20} />
-            <h2 className="text-[#3b82f6] font-bold">Rastreio</h2>
-          </div>
-          <div className="p-6">
-            <p className="text-sm text-[#e5e7eb] whitespace-pre-wrap">{safe.rastreio}</p>
-          </div>
-        </section>
-
-        {/* Seguro */}
-        <section className="bg-[#2d2d2d] border border-[#404040] rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-[#404040] bg-gradient-to-r from-[#fbbf24]/5 to-transparent flex items-center gap-2">
-            <Shield className="text-[#fbbf24]" size={20} />
-            <h2 className="text-[#fbbf24] font-bold">Seguro</h2>
-          </div>
-          <div className="p-6">
-            <p className="text-sm text-[#e5e7eb] whitespace-pre-wrap">{safe.seguro}</p>
-          </div>
-        </section>
-
-        {/* Recebimento */}
-        <section className="bg-[#2d2d2d] border border-[#404040] rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-[#404040] bg-gradient-to-r from-[#d97706]/5 to-transparent flex items-center gap-2">
-            <Video className="text-[#d97706]" size={20} />
-            <h2 className="text-[#d97706] font-bold">Recebimento da Mercadoria</h2>
-          </div>
-          <div className="p-6">
-            <p className="text-sm text-[#e5e7eb] whitespace-pre-wrap">{safe.recebimento}</p>
-          </div>
-        </section>
-
-        {/* Endereço */}
-        <section className="bg-[#2d2d2d] border border-[#404040] rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-[#404040] bg-gradient-to-r from-[#10b981]/5 to-transparent flex items-center gap-2">
-            <MapPin className="text-[#10b981]" size={20} />
-            <h2 className="text-[#10b981] font-bold">Endereço</h2>
-          </div>
-          <div className="p-6">
-            <p className="text-sm text-[#e5e7eb] whitespace-pre-wrap">{safe.endereco}</p>
-          </div>
-        </section>
-
-        {/* Credibilidade */}
-        <section className="bg-[#2d2d2d] border border-[#404040] rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-[#404040] bg-gradient-to-r from-[#8b5cf6]/5 to-transparent flex items-center gap-2">
-            <CheckCircle className="text-[#8b5cf6]" size={20} />
-            <h2 className="text-[#8b5cf6] font-bold">Credibilidade e Confiança</h2>
-          </div>
-          <div className="p-6">
-            <p className="text-sm text-[#e5e7eb] whitespace-pre-wrap">{safe.credibilidade}</p>
-          </div>
-        </section>
-
-        <footer className="mt-12 py-8 text-center border-t border-[#404040]">
-          <p className="text-xs text-[#6b7280]">PB IMPORTS © 2026</p>
-        </footer>
-      </main>
-    </div>
-  );
-}
-
-function applyDefaults(data: Record<string, string>) {
-  const out: Record<string, string> = {};
-  Object.keys(DEFAULT_RULES).forEach((key) => {
-    const val = data[key];
-    out[key] =
-      typeof val === "string" && val.trim() && !val.includes("?")
-        ? val
-        : DEFAULT_RULES[key];
-  });
-  return out;
-}
+const productSchema = z.object({
+  name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  brand: z.string().min(2, "Marca Ã© obrigatÃ³ria"),

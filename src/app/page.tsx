@@ -1,39 +1,61 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Search, Bell, Truck, ScrollText, Lightbulb } from "lucide-react";
-import { Product, Category, CategoryWithStats } from "@/types/product";
+import { ShoppingCart, Plus, Minus, X } from "lucide-react";
+import { Product, Category } from "@/types/product";
 
+// ── Tipos ────────────────────────────────────────────────────
+type BrandGroup = { name: string; products: Product[] };
+type CategoryGroup = { id: string; name: string; abbr: string; brands: BrandGroup[] };
+type CartItem = { cart_item_id: string; product: Product; quantity: number };
+
+// ── Utilitário: session_id persistente no localStorage ───────
+function getSessionId(): string {
+  if (typeof window === "undefined") return "";
+  let sid = localStorage.getItem("pb_session_id");
+  if (!sid) {
+    sid = crypto.randomUUID();
+    localStorage.setItem("pb_session_id", sid);
+  }
+  return sid;
+}
+
+// ── Componente principal ─────────────────────────────────────
 export default function Home() {
-  const [search, setSearch] = useState("");
-  const [showAlert, setShowAlert] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [search, setSearch] = useState("");
+  const [showBanner, setShowBanner] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
+  // Carrinho
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [cartLoading, setCartLoading] = useState(false);
+  const [addingId, setAddingId] = useState<string | null>(null);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  // ── Carrega produtos e categorias ────────────────────────
   useEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);
-        const { data: catData, error: catError } = await supabase
-          .from("categories")
-          .select("*")
-          .order("sort_order", { ascending: true });
-        if (catError) throw catError;
+        const { data: catData, error: catErr } = await supabase
+          .from("categories").select("*").order("sort_order", { ascending: true });
+        if (catErr) throw catErr;
         setCategories(catData || []);
 
-        const { data: prodData, error: prodError } = await supabase
-          .from("products")
-          .select("*")
-          .eq("is_active", true)
-          .order("name", { ascending: true });
-        if (prodError) throw prodError;
+        const { data: prodData, error: prodErr } = await supabase
+          .from("products").select("*").eq("is_active", true).order("name", { ascending: true });
+        if (prodErr) throw prodErr;
         setProducts(prodData || []);
       } catch (err: any) {
-        toast.error("Erro ao carregar dados: " + err.message);
+        toast.error("Erro ao carregar produtos: " + err.message);
       } finally {
         setLoading(false);
       }
@@ -41,194 +63,557 @@ export default function Home() {
     fetchData();
   }, []);
 
-  const categoriesWithStats = useMemo(() => {
-    return categories
-      .map((cat) => {
-        const catProducts = products.filter((p) => p.category_id === cat.id);
-        const filteredProducts = catProducts.filter(
-          (p) =>
-            p.name.toLowerCase().includes(search.toLowerCase()) ||
-            p.brand.toLowerCase().includes(search.toLowerCase())
+  // ── Carrega carrinho do Supabase ─────────────────────────
+  const loadCart = useCallback(async () => {
+    const sid = getSessionId();
+    if (!sid) return;
+    try {
+      // Busca ou cria carrinho
+      let { data: cart } = await supabase
+        .from("carts").select("id").eq("session_id", sid).single();
+
+      if (!cart) {
+        const { data: newCart, error } = await supabase
+          .from("carts").insert({ session_id: sid }).select("id").single();
+        if (error) throw error;
+        cart = newCart;
+      }
+
+      // Busca itens com dados do produto
+      const { data: items, error: itemsErr } = await supabase
+        .from("cart_items")
+        .select("id, quantity, product:products(*)")
+        .eq("cart_id", cart.id);
+      if (itemsErr) throw itemsErr;
+
+      setCartItems(
+        (items || []).map((i: any) => ({
+          cart_item_id: i.id,
+          product: i.product,
+          quantity: i.quantity,
+        }))
+      );
+    } catch (err: any) {
+      console.error("Erro ao carregar carrinho:", err);
+    }
+  }, []);
+
+  useEffect(() => { if (mounted) loadCart(); }, [mounted, loadCart]);
+
+  // ── Adiciona ao carrinho ─────────────────────────────────
+  const addToCart = async (product: Product) => {
+    if (product.is_out_of_stock || (product.stock ?? 0) <= 0) return;
+    const sid = getSessionId();
+    setAddingId(product.id);
+    try {
+      // Garante que carrinho existe
+      let { data: cart } = await supabase
+        .from("carts").select("id").eq("session_id", sid).single();
+      if (!cart) {
+        const { data: newCart, error } = await supabase
+          .from("carts").insert({ session_id: sid }).select("id").single();
+        if (error) throw error;
+        cart = newCart;
+      }
+
+      // Verifica se produto já está no carrinho
+      const existing = cartItems.find((i) => i.product.id === product.id);
+      if (existing) {
+        await supabase
+          .from("cart_items")
+          .update({ quantity: existing.quantity + 1 })
+          .eq("id", existing.cart_item_id);
+      } else {
+        await supabase.from("cart_items").insert({
+          cart_id: cart.id,
+          product_id: product.id,
+          quantity: 1,
+        });
+      }
+
+      await loadCart();
+      toast.success(`${product.name} adicionado ao carrinho!`);
+      setCartOpen(true);
+    } catch (err: any) {
+      toast.error("Erro ao adicionar: " + err.message);
+    } finally {
+      setAddingId(null);
+    }
+  };
+
+  // ── Atualiza quantidade ──────────────────────────────────
+  const updateQty = async (item: CartItem, delta: number) => {
+    const newQty = item.quantity + delta;
+    setCartLoading(true);
+    try {
+      if (newQty <= 0) {
+        await supabase.from("cart_items").delete().eq("id", item.cart_item_id);
+      } else {
+        await supabase.from("cart_items").update({ quantity: newQty }).eq("id", item.cart_item_id);
+      }
+      await loadCart();
+    } catch (err: any) {
+      toast.error("Erro ao atualizar carrinho");
+    } finally {
+      setCartLoading(false);
+    }
+  };
+
+  // ── Remove item ──────────────────────────────────────────
+  const removeItem = async (item: CartItem) => {
+    setCartLoading(true);
+    try {
+      await supabase.from("cart_items").delete().eq("id", item.cart_item_id);
+      await loadCart();
+    } catch (err: any) {
+      toast.error("Erro ao remover item");
+    } finally {
+      setCartLoading(false);
+    }
+  };
+
+  // ── Totais do carrinho ───────────────────────────────────
+  const cartTotal = cartItems.reduce(
+    (sum, i) => sum + (Number(i.product.price) || 0) * i.quantity, 0
+  );
+  const cartCount = cartItems.reduce((sum, i) => sum + i.quantity, 0);
+
+  // ── Highlight busca ──────────────────────────────────────
+  const highlight = (text: string | null | undefined) => {
+    const safeText = text || "";
+    if (!search.trim()) return safeText;
+    try {
+      const re = new RegExp(`(${search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+      return safeText.replace(re, "<mark>$1</mark>");
+    } catch { return safeText; }
+  };
+
+  // ── Grupos de categorias ─────────────────────────────────
+  const groups: CategoryGroup[] = useMemo(() => {
+    const normalized = categories.map((cat) => {
+      const catProducts = products.filter((p) => p.category_id === cat.id);
+      const filtered = catProducts.filter((p) => {
+        if (!search) return true;
+        const s = search.toLowerCase();
+        return (
+          (p.name || "").toLowerCase().includes(s) ||
+          (p.brand || "").toLowerCase().includes(s) ||
+          (cat.name || "").toLowerCase().includes(s)
         );
-        const marcas = new Set(catProducts.map((p) => p.brand));
-        const emFalta = catProducts.filter((p) => p.is_out_of_stock).length;
-        return {
-          ...cat,
-          totalMarcas: marcas.size,
-          totalEmFalta: emFalta,
-          produtos: filteredProducts,
-        } as CategoryWithStats;
-      })
-      .filter((cat) => cat.produtos.length > 0 || search === "");
+      });
+      const brandsMap = new Map<string, Product[]>();
+      filtered.forEach((p) => {
+        const b = p.brand || "Outros";
+        brandsMap.set(b, [...(brandsMap.get(b) || []), p]);
+      });
+      const brands: BrandGroup[] = Array.from(brandsMap.entries()).map(([name, products]) => ({ name, products }));
+      return { id: cat.id, name: cat.name || "Sem Categoria", abbr: (cat.name || "??").slice(0, 2).toUpperCase(), brands };
+    });
+    return normalized.filter((c) => c.brands.length > 0);
   }, [categories, products, search]);
 
-  const totalAvailable = products.filter((p) => !p.is_out_of_stock).length;
-  const totalOutOfStock = products.filter((p) => p.is_out_of_stock).length;
+  const totalAvailable = useMemo(() => products.filter((p) => !(p.is_out_of_stock || (p.stock ?? 0) <= 0)).length, [products]);
+  const totalOut = useMemo(() => products.filter((p) => p.is_out_of_stock || (p.stock ?? 0) <= 0).length, [products]);
+
+  if (!mounted) return null;
 
   return (
-    <div className="page-shell">
+    <div className="wrapper">
       <style jsx global>{`
         :root {
-          --bg-void: #020408;
-          --bg-panel: #060d16;
-          --bg-card: #0a1628;
-          --bg-card2: #081220;
-          --accent-cyan: #00e5ff;
-          --accent-blue: #1565ff;
-          --accent-gold: #ffd600;
-          --accent-green: #00ff9d;
-          --accent-red: #ff2d5f;
-          --text-primary: #e8f4ff;
-          --text-muted: #4a7090;
-          --text-dim: #2a4060;
-          --border-dim: rgba(0, 229, 255, 0.08);
+          --bg-void: #FAF8EF;
+          --bg-panel: #F2EDE0;
+          --bg-card: #FFFFFF;
+          --bg-card2: #EDE8DA;
+          --accent-terra: #C28266;
+          --accent-terra-light: #D9A890;
+          --accent-terra-dark: #9E6650;
+          --accent-rose: #E8C4B2;
+          --accent-sage: #7AAF90;
+          --accent-amber: #D4A96A;
+          --accent-red: #C0614F;
+          --text-primary: #0D0F13;
+          --text-muted: #7A6558;
+          --text-dim: #B0A090;
+          --border-main: rgba(194,130,102,0.22);
+          --border-dim: rgba(194,130,102,0.12);
+          --grid-line: rgba(194,130,102,0.06);
         }
-        body { background: var(--bg-void); color: var(--text-primary); font-family: "Rajdhani", sans-serif; }
-        .page-shell { min-height: 100vh; background: var(--bg-void); color: var(--text-primary); }
-        .top { display:flex; align-items:center; justify-content:space-between; padding:18px 20px 10px; max-width:1180px; margin:0 auto; }
-        .brand { display:flex; align-items:center; gap:10px; }
-        .brand-mark { width:42px; height:42px; background:linear-gradient(135deg,var(--accent-cyan),var(--accent-blue)); clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); display:flex; align-items:center; justify-content:center; font-family:"Orbitron",monospace; font-weight:900; color:var(--bg-void); }
-        .brand-text { display:flex; flex-direction:column; line-height:1.1; }
-        .brand-name { font-family:"Orbitron",monospace; letter-spacing:2px; font-size:14px; color:var(--accent-cyan); text-transform:uppercase; }
-        .brand-sub { font-family:"Share Tech Mono",monospace; font-size:9px; color:var(--text-muted); letter-spacing:3px; text-transform:uppercase; }
-        .hero { max-width: 1180px; margin: 0 auto; padding: 10px 20px 20px; }
-        .title { font-family: "Orbitron", monospace; font-size: 32px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
-        .badge-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 18px; }
-        .stat { display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid var(--border-dim); background: var(--bg-card); font-family:"Share Tech Mono", monospace; font-size:12px; letter-spacing:1px; text-transform:uppercase; }
-        .stat.green { border-color: rgba(0,255,157,0.3); color: var(--accent-green); }
-        .stat.red { border-color: rgba(255,45,95,0.3); color: var(--accent-red); }
-        .search-box { position: relative; margin: 14px 0 18px; }
-        .search-input { width: 100%; padding: 14px 48px; background: var(--bg-card); border:1px solid var(--border-dim); color: var(--text-primary); font-size:15px; letter-spacing:0.5px; outline:none; }
-        .search-input::placeholder { color: var(--text-muted); }
-        .search-input:focus { border-color: var(--accent-cyan); box-shadow: 0 0 12px rgba(0,229,255,0.15); }
-        .search-icon { position:absolute; left:16px; top:50%; transform:translateY(-50%); color: var(--text-muted); }
-        .alert { display:flex; gap:14px; align-items:center; background: var(--bg-card); border:1px solid rgba(255,214,0,0.25); padding:14px 16px; margin-bottom:16px; box-shadow:0 0 24px rgba(255,214,0,0.08); }
-        .alert h4 { font-weight:700; letter-spacing:0.5px; }
-        .cta-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap:12px; margin-bottom:16px; }
-        .cta { padding:18px; border:1px solid var(--border-dim); background: var(--bg-card); display:flex; flex-direction:column; gap:6px; transition:all 0.2s; }
-        .cta:hover { border-color: var(--accent-cyan); box-shadow:0 0 20px rgba(0,229,255,0.08); }
-        .cta-title { font-family:"Orbitron", monospace; letter-spacing:1px; font-size:15px; }
-        .info { display:flex; gap:12px; background:var(--bg-card); border:1px solid rgba(255,214,0,0.25); padding:12px 14px; margin-bottom:18px; }
-        .cat-list { display:flex; flex-direction:column; gap:14px; }
-        .cat-card { border:1px solid var(--border-dim); background:var(--bg-card2); padding:14px 16px; }
-        .cat-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
-        .cat-name { font-family:"Orbitron", monospace; font-size:16px; letter-spacing:1px; }
-        .cat-stats { display:flex; gap:10px; font-family:"Share Tech Mono", monospace; font-size:10px; color: var(--text-muted); }
-        .prod-grid { margin-top:12px; display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
-        .prod { padding:12px; border:1px solid var(--border-dim); background:var(--bg-card); display:flex; flex-direction:column; gap:6px; }
-        .prod-name { font-weight:700; letter-spacing:0.3px; }
-        .prod-brand { font-family:"Share Tech Mono", monospace; font-size:10px; color: var(--text-muted); letter-spacing:1px; text-transform:uppercase; }
-        .prod-status { align-self:flex-start; padding:3px 8px; border:1px solid; font-family:"Share Tech Mono", monospace; font-size:9px; letter-spacing:1px; }
-        .ok { border-color: rgba(0,255,157,0.4); color: var(--accent-green); background: rgba(0,255,157,0.07); }
-        .out { border-color: rgba(255,45,95,0.4); color: var(--accent-red); background: rgba(255,45,95,0.07); }
-        .empty { text-align:center; padding:40px; border:1px dashed var(--border-dim); background:var(--bg-card); color:var(--text-muted); }
-        footer { border-top:1px solid var(--border-dim); margin-top:28px; padding:18px; text-align:center; font-family:"Share Tech Mono", monospace; font-size:10px; color: var(--text-muted); letter-spacing:2px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          background: var(--bg-void);
+          font-family: "DM Sans", "Raleway", system-ui, sans-serif;
+          color: var(--text-primary);
+          min-height: 100vh;
+          overflow-x: hidden;
+        }
+        body::after {
+          content: "";
+          position: fixed; inset: 0;
+          background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+          background-size: 40px 40px;
+          pointer-events: none; z-index: 0;
+        }
+        mark { background: rgba(194,130,102,0.2); color: var(--accent-terra-dark); border-radius: 2px; padding: 0 2px; }
       `}</style>
 
-      <div className="top">
-        <div className="brand">
-          <div className="brand-mark">PB</div>
-          <div className="brand-text">
-            <div className="brand-name">PB IMPORTS</div>
-            <div className="brand-sub">DISPONIBILIDADE</div>
+      <style jsx>{`
+        .wrapper { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; position: relative; z-index: 1; }
+        @media (max-width: 960px) {
+          .wrapper { padding: 20px 16px 64px; }
+          .page-title { font-size: 26px; }
+        }
+
+        /* ── Top bar ── */
+        .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; }
+        .top-logo { display: flex; align-items: center; gap: 14px; }
+        .logo-hex {
+          width: 46px; height: 46px;
+          background: linear-gradient(135deg, var(--accent-terra), var(--accent-terra-dark));
+          clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+          display: flex; align-items: center; justify-content: center;
+          animation: pulse-logo 3s ease-in-out infinite; flex-shrink: 0;
+        }
+        @keyframes pulse-logo {
+          0%, 100% { filter: brightness(1) drop-shadow(0 0 5px rgba(194,130,102,0.45)); }
+          50% { filter: brightness(1.15) drop-shadow(0 0 14px rgba(194,130,102,0.65)); }
+        }
+        .logo-hex span { font-family: "Raleway", sans-serif; font-size: 13px; font-weight: 700; color: #fff; }
+        .logo-text .logo-name { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: var(--accent-terra-dark); letter-spacing: 2px; text-transform: uppercase; }
+        .logo-text .logo-sub { font-size: 10px; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; display: block; }
+
+        /* ── Botão carrinho ── */
+        .cart-btn {
+          position: relative; display: flex; align-items: center; gap: 8px;
+          padding: 10px 18px; background: var(--accent-terra); color: #fff;
+          border: none; border-radius: 10px; cursor: pointer; font-family: "Raleway", sans-serif;
+          font-size: 14px; font-weight: 600; transition: all 0.2s;
+        }
+        .cart-btn:hover { background: var(--accent-terra-dark); transform: translateY(-1px); }
+        .cart-badge {
+          position: absolute; top: -6px; right: -6px;
+          width: 20px; height: 20px; background: #C0614F; color: #fff;
+          border-radius: 50%; font-size: 11px; font-weight: 700;
+          display: flex; align-items: center; justify-content: center;
+        }
+
+        /* ── Títulos e badges ── */
+        .page-title { font-family: "Raleway", sans-serif; font-size: 32px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 24px; color: var(--text-primary); }
+        .page-title span { color: var(--accent-terra); }
+        .badges { display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
+        .badge { padding: 8px 20px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; border: 1px solid; border-radius: 8px; }
+        .badge.green { border-color: var(--accent-sage); color: var(--accent-sage); background: rgba(122,175,144,0.1); }
+        .badge.red { border-color: var(--accent-red); color: var(--accent-red); background: rgba(192,97,79,0.08); }
+
+        /* ── Search ── */
+        .search-wrap { position: relative; margin-bottom: 20px; }
+        .search-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 16px; }
+        .search-input { width: 100%; padding: 14px 16px 14px 46px; background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 10px; color: var(--text-primary); font-family: "DM Sans", sans-serif; font-size: 16px; outline: none; transition: all 0.2s; }
+        .search-input::placeholder { color: var(--text-dim); }
+        .search-input:focus { border-color: var(--accent-terra); box-shadow: 0 0 0 3px rgba(194,130,102,0.12); }
+
+        /* ── Banner notif ── */
+        .notif-banner { display: flex; align-items: center; gap: 14px; padding: 16px 20px; background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 10px; margin-bottom: 16px; cursor: pointer; transition: all 0.2s; animation: slideIn 0.5s ease both; }
+        .notif-banner:hover { border-color: var(--accent-terra); }
+        .notif-icon { width: 36px; height: 36px; background: rgba(194,130,102,0.1); border: 1px solid var(--border-main); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+        .notif-text strong { display: block; font-size: 15px; font-weight: 600; color: var(--text-primary); }
+        .notif-text span { font-size: 12px; color: var(--text-muted); }
+        .notif-close { margin-left: auto; color: var(--text-dim); font-size: 18px; cursor: pointer; padding: 4px; }
+
+        /* ── Quick links ── */
+        .quick-links { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+        .quick-banner-icon { width: 36px; height: 36px; background: rgba(194,130,102,0.1); border: 1px solid var(--border-main); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+        .quick-banner-text strong { display: block; font-size: 15px; font-weight: 600; color: var(--text-primary); }
+        .quick-banner-text span { font-size: 12px; color: var(--text-muted); }
+
+        /* ── Info strip ── */
+        .info-strip { display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px; background: var(--bg-card2); border: 1px solid var(--border-dim); border-left: 3px solid var(--accent-terra); border-radius: 0 8px 8px 0; margin-bottom: 28px; font-size: 14px; line-height: 1.6; animation: slideIn 0.5s ease 0.2s both; }
+        .info-strip .i-icon { font-size: 16px; margin-top: 2px; flex-shrink: 0; }
+        .info-strip .cyan { color: var(--accent-terra); font-weight: 600; }
+        .info-strip .red { color: var(--accent-red); font-weight: 600; }
+
+        @keyframes slideIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ── Categoria ── */
+        .cat-block { margin-bottom: 10px; border: 1px solid var(--border-main); border-radius: 12px; background: var(--bg-card); overflow: hidden; animation: slideIn 0.5s ease both; transition: box-shadow 0.2s; }
+        .cat-block:hover { box-shadow: 0 4px 20px rgba(194,130,102,0.1); }
+        .cat-header { display: flex; align-items: center; gap: 16px; padding: 18px 24px; cursor: pointer; transition: background 0.2s; user-select: none; }
+        .cat-header:hover { background: rgba(194,130,102,0.04); }
+        .cat-icon { width: 38px; height: 38px; background: rgba(194,130,102,0.1); border: 1px solid var(--border-main); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: "Raleway", sans-serif; font-size: 12px; font-weight: 700; color: var(--accent-terra-dark); flex-shrink: 0; }
+        .cat-info { flex: 1; }
+        .cat-name { font-family: "Raleway", sans-serif; font-size: 14px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.5px; text-transform: uppercase; }
+        .cat-meta { display: flex; align-items: center; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+        .cat-meta-item { font-size: 12px; color: var(--text-muted); }
+        .cat-meta-item .val { color: var(--text-primary); font-weight: 600; }
+        .cat-meta-item .val.out { color: var(--accent-red); }
+        .cat-meta-sep { color: var(--text-dim); font-size: 12px; }
+        .cat-arrow { font-size: 12px; color: var(--accent-terra); transition: transform 0.3s; flex-shrink: 0; }
+        .cat-block.open .cat-arrow { transform: rotate(180deg); }
+        .cat-body { display: none; border-top: 1px solid var(--border-dim); padding: 12px 16px 16px; }
+        .cat-block.open .cat-body { display: block; }
+
+        /* ── Marca ── */
+        .brand-block { margin-bottom: 8px; border: 1px solid var(--border-dim); border-radius: 8px; background: var(--bg-card2); }
+        .brand-header { display: flex; align-items: center; gap: 14px; padding: 12px 18px; cursor: pointer; transition: background 0.2s; user-select: none; border-radius: 8px; }
+        .brand-header:hover { background: rgba(194,130,102,0.06); }
+        .brand-dot { width: 6px; height: 6px; background: var(--accent-terra-light); border-radius: 50%; flex-shrink: 0; }
+        .brand-name { font-size: 13px; font-weight: 600; color: var(--text-primary); letter-spacing: 0.5px; text-transform: uppercase; flex: 1; }
+        .brand-count { font-size: 11px; color: var(--text-muted); padding: 3px 10px; border: 1px solid var(--border-dim); border-radius: 20px; background: var(--bg-card); }
+        .brand-arrow { font-size: 10px; color: var(--text-muted); transition: transform 0.3s; margin-left: 8px; }
+        .brand-block.open .brand-arrow { transform: rotate(180deg); }
+        .brand-block.open .brand-body { display: block; }
+        .brand-body { display: none; border-top: 1px solid var(--border-dim); padding: 12px 18px 14px; }
+
+        /* ── Product card ── */
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+        .product-card { background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 10px; padding: 16px; transition: all 0.2s; }
+        .product-card:hover { border-color: var(--accent-terra-light); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(194,130,102,0.12); }
+        .product-card.out-of-stock { opacity: 0.65; border-color: rgba(192,97,79,0.2); }
+        .product-name { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; line-height: 1.3; }
+        .product-brand-label { font-size: 11px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+        .product-price { font-family: "Raleway", sans-serif; font-size: 16px; font-weight: 700; color: var(--accent-terra-dark); margin-bottom: 10px; }
+        .product-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .product-status { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; border: 1px solid; border-radius: 20px; }
+        .product-status.available { border-color: rgba(122,175,144,0.5); color: var(--accent-sage); background: rgba(122,175,144,0.1); }
+        .product-status.unavailable { border-color: rgba(192,97,79,0.4); color: var(--accent-red); background: rgba(192,97,79,0.08); }
+        .product-status::before { content: ""; width: 5px; height: 5px; border-radius: 50%; }
+        .product-status.available::before { background: var(--accent-sage); }
+        .product-status.unavailable::before { background: var(--accent-red); }
+        .add-btn { display: flex; align-items: center; gap: 5px; padding: 5px 12px; background: var(--accent-terra); color: #fff; border: none; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+        .add-btn:hover { background: var(--accent-terra-dark); }
+        .add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ── Drawer carrinho ── */
+        .cart-overlay { position: fixed; inset: 0; background: rgba(13,15,19,0.4); z-index: 100; backdrop-filter: blur(4px); animation: fadeIn 0.2s ease; }
+        .cart-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 420px; max-width: 95vw; background: var(--bg-card); border-left: 1px solid var(--border-main); z-index: 101; display: flex; flex-direction: column; animation: slideRight 0.3s ease; box-shadow: -8px 0 40px rgba(194,130,102,0.15); }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .cart-head { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border-dim); }
+        .cart-head h2 { font-family: "Raleway", sans-serif; font-size: 18px; font-weight: 700; color: var(--text-primary); }
+        .cart-close { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--bg-card2); border: 1px solid var(--border-dim); border-radius: 8px; cursor: pointer; color: var(--text-muted); transition: all 0.2s; }
+        .cart-close:hover { border-color: var(--accent-red); color: var(--accent-red); }
+        .cart-body { flex: 1; overflow-y: auto; padding: 16px 24px; }
+        .cart-empty { text-align: center; padding: 48px 0; color: var(--text-muted); font-size: 14px; }
+        .cart-item-row { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border-dim); }
+        .cart-item-info { flex: 1; min-width: 0; }
+        .cart-item-name { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.3; margin-bottom: 3px; }
+        .cart-item-price { font-size: 13px; color: var(--accent-terra-dark); font-weight: 600; }
+        .cart-item-qty { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+        .qty-btn { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; background: var(--bg-card2); border: 1px solid var(--border-main); border-radius: 6px; cursor: pointer; color: var(--text-primary); transition: all 0.2s; }
+        .qty-btn:hover { border-color: var(--accent-terra); color: var(--accent-terra); }
+        .qty-val { font-size: 14px; font-weight: 600; color: var(--text-primary); min-width: 20px; text-align: center; }
+        .cart-remove { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; cursor: pointer; color: var(--text-dim); transition: color 0.2s; flex-shrink: 0; }
+        .cart-remove:hover { color: var(--accent-red); }
+        .cart-foot { padding: 20px 24px; border-top: 1px solid var(--border-dim); background: var(--bg-card); }
+        .cart-subtotal { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .cart-subtotal span { font-size: 14px; color: var(--text-muted); }
+        .cart-subtotal strong { font-family: "Raleway", sans-serif; font-size: 20px; font-weight: 700; color: var(--accent-terra-dark); }
+        .checkout-btn { width: 100%; padding: 14px; background: var(--accent-terra); color: #fff; border: none; border-radius: 10px; font-family: "Raleway", sans-serif; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px; }
+        .checkout-btn:hover { background: var(--accent-terra-dark); transform: translateY(-1px); }
+
+        .empty-state { text-align: center; padding: 48px 24px; font-size: 13px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
+        .results-count { font-size: 12px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 20px; }
+        .results-count span { color: var(--accent-terra); font-weight: 700; }
+      `}</style>
+
+      {/* ── Top bar com logo + botão carrinho ── */}
+      <div className="top-bar">
+        <div className="top-logo">
+          <div className="logo-hex"><span>PB</span></div>
+          <div className="logo-text">
+            <span className="logo-name">PB Imports</span>
+            <span className="logo-sub">Disponibilidade</span>
           </div>
         </div>
+        <button className="cart-btn" onClick={() => setCartOpen(true)}>
+          <ShoppingCart size={18} />
+          Carrinho
+          {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
+        </button>
       </div>
 
-      <div className="hero">
-        <div className="title">Lista de <span style={{color:"var(--accent-cyan)"}}>Disponibilidade</span></div>
-        <div className="badge-row">
-          <div className="stat green">{totalAvailable} disponíveis</div>
-          <div className="stat red">{totalOutOfStock} em falta</div>
-        </div>
+      <div className="page-title">Lista de <span>Disponibilidade</span></div>
 
-        <div className="search-box">
-          <Search className="search-icon" size={18} />
-          <input
-            className="search-input"
-            placeholder="Buscar produto ou marca..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+      <div className="badges">
+        <div className="badge green">⬡ {totalAvailable} Disponíveis</div>
+        <div className="badge red">◈ {totalOut} Em Falta</div>
+      </div>
 
-        {showAlert && (
-          <div className="alert">
-            <div style={{background:"rgba(255,214,0,0.08)", padding:10, borderRadius:8}}>
-              <Bell color="#ffd600" size={18} />
-            </div>
-            <div style={{flex:1}}>
-              <h4>52 atualizações desde sua última visita</h4>
-              <p style={{color:"var(--text-muted)", fontSize:12}}>Toque para ver o que mudou</p>
-            </div>
-            <button onClick={()=>setShowAlert(false)} style={{color:"var(--text-muted)", background:"transparent", border:"none", cursor:"pointer"}}>✕</button>
+      <div className="search-wrap">
+        <span className="search-icon">⌕</span>
+        <input type="text" className="search-input" placeholder="Buscar produto ou marca..." value={search} onChange={(e) => setSearch(e.target.value)} autoComplete="off" />
+      </div>
+
+      {showBanner && (
+        <div className="notif-banner">
+          <div className="notif-icon">🔔</div>
+          <div className="notif-text">
+            <strong>52 atualizações desde sua última visita</strong>
+            <span>Toque para ver o que mudou</span>
           </div>
-        )}
-
-        <div className="cta-grid">
-          <Link href="/fretes" className="cta" style={{borderColor:"rgba(0,255,157,0.25)", boxShadow:"0 0 12px rgba(0,255,157,0.08)"}}>
-            <div className="cta-title" style={{color:"var(--accent-green)"}}>Tabela de Fretes</div>
-            <div style={{color:"var(--text-muted)", fontSize:12, letterSpacing:1}}>Valores de entrega</div>
-          </Link>
-          <Link href="/regras" className="cta" style={{borderColor:"rgba(255,214,0,0.25)", boxShadow:"0 0 12px rgba(255,214,0,0.08)"}}>
-            <div className="cta-title" style={{color:"var(--accent-gold)"}}>Regras de Envio</div>
-            <div style={{color:"var(--text-muted)", fontSize:12, letterSpacing:1}}>Como funciona</div>
-          </Link>
+          <span className="notif-close" onClick={() => setShowBanner(false)}>✕</span>
         </div>
+      )}
 
-        <Link href="/curiosidades" className="cta" style={{borderColor:"rgba(139,92,246,0.25)", boxShadow:"0 0 12px rgba(139,92,246,0.08)", marginTop:16, marginBottom:16}}>
-          <div className="cta-title" style={{color:"var(--accent-purple)"}}>Curiosidades</div>
-          <div style={{color:"var(--text-muted)", fontSize:12, letterSpacing:1}}>Dicas e fatos rápidos</div>
+      <div className="quick-links">
+        <Link href="/fretes" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", cursor: "pointer", textDecoration: "none", color: "inherit" }}>
+          <div className="quick-banner-icon">🚚</div>
+          <div className="quick-banner-text"><strong>Tabela de Fretes</strong><span>Valores de entrega</span></div>
         </Link>
+        <Link href="/regras" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", cursor: "pointer", textDecoration: "none", color: "inherit" }}>
+          <div className="quick-banner-icon">📋</div>
+          <div className="quick-banner-text"><strong>Regras de Envio</strong><span>Como funciona</span></div>
+        </Link>
+      </div>
 
-        <div className="info">
-          <Lightbulb color="#ffd600" size={18} />
-          <p className="text-sm">
-            Esta lista mostra <span style={{color:"var(--accent-cyan)", fontWeight:700}}>todos os produtos</span> da PB Imports. Produtos <span style={{color:"var(--accent-red)", fontWeight:700}}>em falta</span> serão repostos em breve.
-          </p>
-        </div>
+      <Link href="/curiosidades" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", cursor: "pointer", textDecoration: "none", color: "inherit", marginBottom: "12px" }}>
+        <div className="quick-banner-icon">💡</div>
+        <div className="quick-banner-text"><strong>Curiosidades</strong><span>Dicas e fatos rápidos</span></div>
+      </Link>
 
-        <div className="cat-list">
-          {loading ? (
-            <div className="empty">Carregando lista...</div>
-          ) : categoriesWithStats.length === 0 ? (
-            <div className="empty">
-              <Search size={22} style={{opacity:0.4, marginBottom:8}} />
-              Nenhum produto encontrado. Ajuste sua busca.
-            </div>
-          ) : (
-            categoriesWithStats.map((cat) => (
-              <div className="cat-card" key={cat.id}>
-                <div className="cat-head">
-                  <div>
-                    <div className="cat-name">{cat.name}</div>
-                    <div className="cat-stats">
-                      <span>{cat.totalMarcas} marcas</span>
-                      <span>{cat.produtos.length} itens</span>
-                      <span style={{color: cat.totalEmFalta ? "var(--accent-red)" : "var(--text-muted)"}}>{cat.totalEmFalta} em falta</span>
+      <div className="info-strip">
+        <span className="i-icon">💡</span>
+        <span>Esta lista mostra <span className="cyan">todos os produtos</span> da PB Imports. Produtos <span className="red">em falta</span> serão repostos em breve.</span>
+      </div>
+
+      <div className="results-count">
+        Exibindo <span>{groups.length}</span> categorias · <span>{products.length}</span> produtos
+      </div>
+
+      {/* ── Catálogo ── */}
+      <div id="catalog">
+        {loading ? (
+          <div className="empty-state">Carregando...</div>
+        ) : groups.length === 0 ? (
+          <div className="empty-state">Nenhum produto encontrado</div>
+        ) : (
+          groups.map((cat, ci) => {
+            const totalProds = cat.brands.reduce((a, b) => a + b.products.length, 0);
+            const outProds = cat.brands.reduce((a, b) => a + b.products.filter((p) => p.is_out_of_stock || (p.stock ?? 0) <= 0).length, 0);
+            return (
+              <div className={`cat-block ${ci === 0 ? "open" : ""}`} key={cat.id} style={{ animationDelay: `${ci * 0.07}s` }}>
+                <div className="cat-header" onClick={(e) => { (e.currentTarget.parentElement as HTMLElement)?.classList.toggle("open"); }}>
+                  <div className="cat-icon">{cat.abbr}</div>
+                  <div className="cat-info">
+                    <div className="cat-name" dangerouslySetInnerHTML={{ __html: highlight(cat.name) }} />
+                    <div className="cat-meta">
+                      <span className="cat-meta-item"><span className="val">{cat.brands.length}</span> marca{cat.brands.length !== 1 ? "s" : ""}</span>
+                      <span className="cat-meta-sep">·</span>
+                      <span className="cat-meta-item"><span className="val">{totalProds}</span> iten{totalProds !== 1 ? "s" : ""}</span>
+                      {outProds > 0 && (<><span className="cat-meta-sep">·</span><span className="cat-meta-item"><span className="val out">{outProds} em falta</span></span></>)}
                     </div>
                   </div>
+                  <span className="cat-arrow">▼</span>
                 </div>
-                <div className="prod-grid">
-                  {cat.produtos.map((p) => (
-                    <div className="prod" key={p.id}>
-                      <div className="prod-name">{p.name}</div>
-                      <div className="prod-brand">{p.brand}</div>
-                      <span className={`prod-status ${p.is_out_of_stock ? "out" : "ok"}`}>
-                        {p.is_out_of_stock ? "Em falta" : "Disponível"}
-                      </span>
+                <div className="cat-body">
+                  {cat.brands.map((brand, bi) => (
+                    <div className={`brand-block ${search ? "open" : ""}`} key={bi}>
+                      <div className="brand-header" onClick={(e) => { e.stopPropagation(); (e.currentTarget.parentElement as HTMLElement)?.classList.toggle("open"); }}>
+                        <div className="brand-dot"></div>
+                        <span className="brand-name" dangerouslySetInnerHTML={{ __html: highlight(brand.name) }} />
+                        <span className="brand-count">{brand.products.length} produto{brand.products.length !== 1 ? "s" : ""}</span>
+                        <span className="brand-arrow">▼</span>
+                      </div>
+                      <div className="brand-body">
+                        <div className="product-grid">
+                          {brand.products.map((p) => {
+                            const outOfStock = p.is_out_of_stock || (p.stock ?? 0) <= 0;
+                            return (
+                              <div className={`product-card ${outOfStock ? "out-of-stock" : ""}`} key={p.id}>
+                                <div className="product-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
+                                <div className="product-brand-label" dangerouslySetInnerHTML={{ __html: highlight(brand.name) }} />
+                                {p.price && (
+                                  <div className="product-price">
+                                    R$ {Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                  </div>
+                                )}
+                                <div className="product-footer">
+                                  <span className={`product-status ${outOfStock ? "unavailable" : "available"}`}>
+                                    {outOfStock ? "Em Falta" : "Disponível"}
+                                  </span>
+                                  {!outOfStock && (
+                                    <button
+                                      className="add-btn"
+                                      onClick={() => addToCart(p)}
+                                      disabled={addingId === p.id}
+                                    >
+                                      <Plus size={13} />
+                                      {addingId === p.id ? "..." : "Adicionar"}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            );
+          })
+        )}
       </div>
 
-      <footer>
-        PB IMPORTS · {products.length} PRODUTOS — Made with Dyad
-      </footer>
+      {/* ── Drawer do carrinho ── */}
+      {cartOpen && (
+        <>
+          <div className="cart-overlay" onClick={() => setCartOpen(false)} />
+          <div className="cart-drawer">
+            <div className="cart-head">
+              <h2>🛒 Meu Carrinho {cartCount > 0 && `(${cartCount})`}</h2>
+              <button className="cart-close" onClick={() => setCartOpen(false)}><X size={16} /></button>
+            </div>
+
+            <div className="cart-body">
+              {cartItems.length === 0 ? (
+                <div className="cart-empty">
+                  <p style={{ fontSize: 32, marginBottom: 12 }}>🛍️</p>
+                  <p>Seu carrinho está vazio</p>
+                  <p style={{ fontSize: 12, marginTop: 6, color: "var(--text-dim)" }}>Adicione produtos do catálogo</p>
+                </div>
+              ) : (
+                cartItems.map((item) => (
+                  <div className="cart-item-row" key={item.cart_item_id}>
+                    <div className="cart-item-info">
+                      <div className="cart-item-name">{item.product.name}</div>
+                      <div className="cart-item-price">
+                        R$ {(Number(item.product.price) * item.quantity).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        {item.quantity > 1 && (
+                          <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 6, fontWeight: 400 }}>
+                            (R$ {Number(item.product.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} cada)
+                          </span>
+                        )}
+                      </div>
+                      <div className="cart-item-qty">
+                        <button className="qty-btn" onClick={() => updateQty(item, -1)} disabled={cartLoading}><Minus size={12} /></button>
+                        <span className="qty-val">{item.quantity}</span>
+                        <button className="qty-btn" onClick={() => updateQty(item, +1)} disabled={cartLoading}><Plus size={12} /></button>
+                      </div>
+                    </div>
+                    <button className="cart-remove" onClick={() => removeItem(item)} disabled={cartLoading}><X size={16} /></button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {cartItems.length > 0 && (
+              <div className="cart-foot">
+                <div className="cart-subtotal">
+                  <span>Subtotal dos produtos</span>
+                  <strong>R$ {cartTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+                </div>
+                <Link href="/checkout" style={{ textDecoration: "none" }}>
+                  <button className="checkout-btn" onClick={() => setCartOpen(false)}>
+                    Finalizar Pedido →
+                  </button>
+                </Link>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -4,26 +4,43 @@
 
 @layer base {
   :root {
-    --background: 0 0% 10%;
-    --foreground: 0 0% 100%;
-    --card: 0 0% 18%;
-    --card-foreground: 0 0% 100%;
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 214 52% 25%; /* Navy Blue #1e3a5f */
+    --background: 43 47% 95%;           /* #FAF8EF - bege clarinho */
+    --foreground: 225 14% 7%;           /* #0D0F13 - quase preto */
+    --card: 0 0% 100%;                  /* branco puro para cards */
+    --card-foreground: 225 14% 7%;
+    --popover: 43 47% 95%;
+    --popover-foreground: 225 14% 7%;
+    --primary: 18 34% 59%;              /* #C28266 - terracota predominante */
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 65%;
-    --accent: 0 0% 15%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
+    --secondary: 33 30% 90%;            /* bege médio */
+    --secondary-foreground: 225 14% 7%;
+    --muted: 33 25% 88%;
+    --muted-foreground: 20 15% 45%;
+    --accent: 25 45% 78%;               /* rosé pastel */
+    --accent-foreground: 225 14% 7%;
+    --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 25%;
-    --input: 0 0% 25%;
-    --ring: 214 52% 25%;
-    --radius: 0.5rem;
+    --border: 30 20% 82%;
+    --input: 30 20% 82%;
+    --ring: 18 34% 59%;
+    --radius: 0.75rem;
+
+    /* Chart colors em tons que harmonizam */
+    --chart-1: 18 34% 59%;              /* terracota */
+    --chart-2: 25 45% 72%;              /* rosé */
+    --chart-3: 38 55% 68%;              /* âmbar suave */
+    --chart-4: 150 20% 60%;             /* sage verde */
+    --chart-5: 200 25% 62%;             /* azul acinzentado */
+
+    /* Sidebar */
+    --sidebar-background: 38 30% 92%;
+    --sidebar-foreground: 225 14% 7%;
+    --sidebar-primary: 18 34% 59%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 33 30% 86%;
+    --sidebar-accent-foreground: 225 14% 7%;
+    --sidebar-border: 30 20% 80%;
+    --sidebar-ring: 18 34% 59%;
   }
 }
 
@@ -32,6 +49,16 @@
     @apply border-border;
   }
   body {
-    @apply bg-[#1a1a1a] text-white antialiased;
+    @apply bg-[#FAF8EF] text-[#0D0F13] antialiased;
   }
+}
+
+/* Fallback de fontes para páginas com textos acentuados */
+.content .title,
+.content .tab,
+.content .panel h3,
+.content .panel p,
+.content .label,
+.content .sub {
+  font-family: "Rajdhani", system-ui, sans-serif !important;
 }

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -37,12 +37,12 @@ import { toast } from "sonner";
 
 const productSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
-  brand: z.string().min(2, "Marca é obrigatória"),
+  brand: z.string().min(2, "Marca Ã© obrigatÃ³ria"),
   category_id: z.string().min(1, "Selecione uma categoria"),
-  price: z.string().transform((val) => parseFloat(val)),
-  stock: z.string().transform((val) => parseInt(val)),
+  price: z.coerce.number().nonnegative("Preco invalido"),
+  stock: z.coerce.number().int("Estoque deve ser inteiro").nonnegative("Estoque invalido"),
   description: z.string().optional(),
-  image_url: z.string().url("URL de imagem inválida").or(z.literal("")),
+  image_url: z.string().url("URL de imagem invÃ¡lida").or(z.literal("")),
   active_ingredient: z.string().optional(),
   usage_mode: z.string().optional(),
   contraindications: z.string().optional(),
@@ -59,8 +59,8 @@ export default function NewProductPage() {
       name: "",
       brand: "",
       category_id: "",
-      price: "0" as any,
-      stock: "0" as any,
+      price: 0,
+      stock: 0,
       description: "",
       image_url: "",
       active_ingredient: "",
@@ -109,7 +109,7 @@ export default function NewProductPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Novo Produto</h1>
-            <p className="text-sm text-gray-500">Preencha as informações para adicionar ao catálogo.</p>
+            <p className="text-sm text-gray-500">Preencha as informaÃ§Ãµes para adicionar ao catÃ¡logo.</p>
           </div>
         </div>
       </div>
@@ -117,11 +117,11 @@ export default function NewProductPage() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Informações Básicas */}
+            {/* InformaÃ§Ãµes BÃ¡sicas */}
             <div className="space-y-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
               <h3 className="font-bold text-gray-900 flex items-center gap-2">
                 <Info size={18} className="text-[#1e3a5f]" />
-                Informações Básicas
+                InformaÃ§Ãµes BÃ¡sicas
               </h3>
               
               <FormField
@@ -158,7 +158,7 @@ export default function NewProductPage() {
                   name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Preço (R$)</FormLabel>
+                      <FormLabel>PreÃ§o (R$)</FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" {...field} />
                       </FormControl>
@@ -212,7 +212,7 @@ export default function NewProductPage() {
             <div className="space-y-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
               <h3 className="font-bold text-gray-900 flex items-center gap-2">
                 <Upload size={18} className="text-[#1e3a5f]" />
-                Mídia e Detalhes
+                MÃ­dia e Detalhes
               </h3>
 
               <FormField
@@ -235,7 +235,7 @@ export default function NewProductPage() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Descrição Curta</FormLabel>
+                    <FormLabel>DescriÃ§Ã£o Curta</FormLabel>
                     <FormControl>
                       <Textarea 
                         placeholder="Breve resumo do produto..." 
@@ -253,7 +253,7 @@ export default function NewProductPage() {
                 name="active_ingredient"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Princípio Ativo (Opcional)</FormLabel>
+                    <FormLabel>PrincÃ­pio Ativo (Opcional)</FormLabel>
                     <FormControl>
                       <Input placeholder="Ex: Paracetamol" {...field} />
                     </FormControl>
@@ -278,3 +278,4 @@ export default function NewProductPage() {
     </div>
   );
 }
+
