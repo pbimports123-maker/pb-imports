@@ -8,7 +8,7 @@ const supabaseAdmin = createClient(
 );
 
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY!;
-const ASAAS_BASE_URL = "https://asaas-proxy.pbimports123.workers.dev/v3";
+const ASAAS_BASE_URL = "https://api.asaas.com/v3";
 
 export async function POST(req: NextRequest) {
   try {
