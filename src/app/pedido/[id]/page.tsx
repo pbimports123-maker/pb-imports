@@ -22,6 +22,7 @@ type Order = {
   payment_status: string;
   pagseguro_qrcode: string | null;
   pagseguro_qrcode_text: string | null;
+  pagseguro_order_id: string | null;
   created_at: string;
 };
 
@@ -41,7 +42,7 @@ export default function PedidoPage() {
   const [loading, setLoading] = useState(true);
   const [generatingPix, setGeneratingPix] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(900); // 15 minutos
+  const [timeLeft, setTimeLeft] = useState(1800); // 30 minutos
 
   // ── Carrega pedido ────────────────────────────────────────
   useEffect(() => {
@@ -120,7 +121,7 @@ export default function PedidoPage() {
         pagseguro_qrcode: data.qrcode,
         pagseguro_qrcode_text: data.qrcodeText,
       } : prev);
-      setTimeLeft(900);
+      setTimeLeft(1800);
     } catch (err: any) {
       toast.error("Erro ao gerar Pix: " + err.message);
     } finally {
@@ -167,16 +168,14 @@ export default function PedidoPage() {
         .root { min-height: 100vh; background: #FAF8EF; padding: 32px 16px 80px; }
         .wrap { max-width: 680px; margin: 0 auto; }
 
-        /* Header */
         .page-top { text-align: center; margin-bottom: 28px; }
         .order-num { font-size: 12px; color: #A8978E; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
         .page-title { font-family: "Raleway", sans-serif; font-size: 26px; font-weight: 700; color: #0D0F13; }
         .page-title span { color: #C28266; }
 
-        /* Card */
         .card { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 14px; padding: 24px; margin-bottom: 16px; }
 
-        /* Status pago */
+        /* Pago */
         .paid-box { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px; text-align: center; }
         .paid-icon { width: 72px; height: 72px; background: rgba(122,175,144,0.1); border: 2px solid #7AAF90; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
         .paid-title { font-family: "Raleway", sans-serif; font-size: 22px; font-weight: 700; color: #5A8F70; }
@@ -185,10 +184,10 @@ export default function PedidoPage() {
         /* Pix */
         .pix-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
         .pix-title { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #0D0F13; text-transform: uppercase; letter-spacing: 0.5px; }
-        .pix-timer { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: ${timeLeft < 120 ? "#C0614F" : "#D4A96A"}; }
+        .pix-timer { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: ${timeLeft < 300 ? "#C0614F" : "#D4A96A"}; }
         .qrcode-wrap { display: flex; justify-content: center; margin-bottom: 20px; }
-        .qrcode-wrap img { width: 200px; height: 200px; border-radius: 12px; border: 2px solid rgba(194,130,102,0.2); }
-        .qrcode-placeholder { width: 200px; height: 200px; border-radius: 12px; border: 2px dashed rgba(194,130,102,0.3); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: #B0A090; font-size: 13px; }
+        .qrcode-wrap img { width: 220px; height: 220px; border-radius: 12px; border: 2px solid rgba(194,130,102,0.2); }
+        .qrcode-placeholder { width: 220px; height: 220px; border-radius: 12px; border: 2px dashed rgba(194,130,102,0.3); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: #B0A090; font-size: 13px; }
         .pix-separator { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; color: #B0A090; font-size: 12px; }
         .pix-separator::before, .pix-separator::after { content: ""; flex: 1; height: 1px; background: rgba(194,130,102,0.15); }
         .pix-code-box { background: #FAF8EF; border: 1px solid rgba(194,130,102,0.25); border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
@@ -211,23 +210,22 @@ export default function PedidoPage() {
         .total-final span { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #0D0F13; }
         .total-final strong { font-family: "Raleway", sans-serif; font-size: 26px; font-weight: 700; color: #9E6650; }
 
-        /* Info envio */
+        /* Entrega */
         .info-row { display: flex; justify-content: space-between; font-size: 13px; padding: 8px 0; border-bottom: 1px solid rgba(194,130,102,0.08); }
         .info-row:last-child { border-bottom: none; }
         .info-row span { color: #7A6558; }
         .info-row strong { color: #0D0F13; font-weight: 500; }
 
-        /* Botão regenerar */
         .regen-btn { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: transparent; border: 1.5px solid rgba(194,130,102,0.4); border-radius: 8px; color: #C28266; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; margin: 0 auto; font-family: "Raleway", sans-serif; }
         .regen-btn:hover { background: rgba(194,130,102,0.06); }
 
-        /* Link voltar */
         .back-link { display: block; text-align: center; margin-top: 20px; font-size: 13px; color: #A8978E; text-decoration: none; }
         .back-link:hover { color: #C28266; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
       <div className="wrap">
-        {/* Topo */}
         <div className="page-top">
           <div className="order-num">Pedido #{order.id.slice(0, 8).toUpperCase()}</div>
           <h1 className="page-title">{isPaid ? "Pedido " : "Finalizar "}<span>{isPaid ? "Confirmado" : "Pagamento"}</span></h1>
@@ -237,9 +235,7 @@ export default function PedidoPage() {
         {isPaid && (
           <div className="card">
             <div className="paid-box">
-              <div className="paid-icon">
-                <CheckCircle size={36} color="#5A8F70" />
-              </div>
+              <div className="paid-icon"><CheckCircle size={36} color="#5A8F70" /></div>
               <div className="paid-title">Pagamento confirmado! 🎉</div>
               <div className="paid-sub">
                 Olá, <strong>{order.customer_name.split(" ")[0]}</strong>! Seu pedido foi aprovado e será preparado em até 48h úteis.<br />
@@ -266,7 +262,6 @@ export default function PedidoPage() {
               <div className="qrcode-wrap">
                 <div className="qrcode-placeholder">
                   <div style={{ width: 32, height: 32, border: "3px solid #EDE8DA", borderTop: "3px solid #C28266", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                   Gerando QR Code...
                 </div>
               </div>
@@ -303,7 +298,7 @@ export default function PedidoPage() {
           </div>
         )}
 
-        {/* Resumo do pedido */}
+        {/* Resumo */}
         <div className="card">
           <div className="section-title">📦 Itens do pedido</div>
           {items.map((item) => (
@@ -315,21 +310,11 @@ export default function PedidoPage() {
               <div className="item-price">R$ {Number(item.subtotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
             </div>
           ))}
-
           <div className="total-box" style={{ marginTop: 16 }}>
-            <div className="total-row">
-              <span>Subtotal produtos</span>
-              <strong>R$ {Number(order.subtotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
-            </div>
-            <div className="total-row">
-              <span>Frete ({order.shipping_type})</span>
-              <strong>R$ {Number(order.shipping_price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
-            </div>
+            <div className="total-row"><span>Subtotal produtos</span><strong>R$ {Number(order.subtotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
+            <div className="total-row"><span>Frete ({order.shipping_type})</span><strong>R$ {Number(order.shipping_price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
             {order.has_insurance && (
-              <div className="total-row">
-                <span>🔒 Seguro de envio (15%)</span>
-                <strong style={{ color: "#C0614F" }}>R$ {Number(order.insurance_price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
-              </div>
+              <div className="total-row"><span>🔒 Seguro de envio (15%)</span><strong style={{ color: "#C0614F" }}>R$ {Number(order.insurance_price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
             )}
             <div className="total-final">
               <span>Total</span>
@@ -338,7 +323,7 @@ export default function PedidoPage() {
           </div>
         </div>
 
-        {/* Info de entrega */}
+        {/* Entrega */}
         <div className="card">
           <div className="section-title">🚚 Informações de entrega</div>
           <div className="info-row"><span>Destinatário</span><strong>{order.customer_name}</strong></div>

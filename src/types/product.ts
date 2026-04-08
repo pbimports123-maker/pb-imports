@@ -16,6 +16,9 @@ export interface Product {
   is_out_of_stock: boolean;
   is_active: boolean;
   created_at: string;
+  updated_at?: string;
+  presentation?: string;
+  dosage?: string;
 }
 
 export interface Category {

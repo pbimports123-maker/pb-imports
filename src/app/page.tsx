@@ -23,12 +23,26 @@ function getSessionId(): string {
   return sid;
 }
 
+// ── Utilitário: última visita no localStorage ────────────────
+const LAST_VISIT_KEY = "pb_last_visit";
+
+function getLastVisit(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(LAST_VISIT_KEY);
+}
+
+function saveLastVisit(): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
+}
+
 // ── Componente principal ─────────────────────────────────────
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
-  const [showBanner, setShowBanner] = useState(true);
+  const [showBanner, setShowBanner] = useState(false);
+  const [updatesCount, setUpdatesCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
@@ -53,7 +67,28 @@ export default function Home() {
         const { data: prodData, error: prodErr } = await supabase
           .from("products").select("*").eq("is_active", true).order("name", { ascending: true });
         if (prodErr) throw prodErr;
-        setProducts(prodData || []);
+
+        const allProducts: Product[] = prodData || [];
+        setProducts(allProducts);
+
+        // ── Conta atualizações desde a última visita ──
+        const lastVisit = getLastVisit();
+        if (lastVisit) {
+          const count = allProducts.filter((p) => {
+            const updated = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+            const last = new Date(lastVisit).getTime();
+            return updated > last;
+          }).length;
+
+          if (count > 0) {
+            setUpdatesCount(count);
+            setShowBanner(true);
+          }
+        }
+
+        // Salva timestamp da visita atual APÓS contar
+        saveLastVisit();
+
       } catch (err: any) {
         toast.error("Erro ao carregar produtos: " + err.message);
       } finally {
@@ -63,12 +98,16 @@ export default function Home() {
     fetchData();
   }, []);
 
+  // ── Fecha banner e registra visita ───────────────────────
+  const handleCloseBanner = () => {
+    setShowBanner(false);
+  };
+
   // ── Carrega carrinho do Supabase ─────────────────────────
   const loadCart = useCallback(async () => {
     const sid = getSessionId();
     if (!sid) return;
     try {
-      // Busca ou cria carrinho
       let { data: cart } = await supabase
         .from("carts").select("id").eq("session_id", sid).single();
 
@@ -79,7 +118,6 @@ export default function Home() {
         cart = newCart;
       }
 
-      // Busca itens com dados do produto
       const { data: items, error: itemsErr } = await supabase
         .from("cart_items")
         .select("id, quantity, product:products(*)")
@@ -106,7 +144,6 @@ export default function Home() {
     const sid = getSessionId();
     setAddingId(product.id);
     try {
-      // Garante que carrinho existe
       let { data: cart } = await supabase
         .from("carts").select("id").eq("session_id", sid).single();
       if (!cart) {
@@ -116,7 +153,6 @@ export default function Home() {
         cart = newCart;
       }
 
-      // Verifica se produto já está no carrinho
       const existing = cartItems.find((i) => i.product.id === product.id);
       if (existing) {
         await supabase
@@ -444,14 +480,21 @@ export default function Home() {
         <input type="text" className="search-input" placeholder="Buscar produto ou marca..." value={search} onChange={(e) => setSearch(e.target.value)} autoComplete="off" />
       </div>
 
-      {showBanner && (
+      {/* ── Banner dinâmico de atualizações ── */}
+      {showBanner && updatesCount > 0 && (
         <div className="notif-banner">
           <div className="notif-icon">🔔</div>
           <div className="notif-text">
-            <strong>52 atualizações desde sua última visita</strong>
-            <span>Toque para ver o que mudou</span>
+            <strong>
+              {updatesCount} {updatesCount === 1 ? "atualização" : "atualizações"} desde sua última visita
+            </strong>
+            <span>
+              {updatesCount === 1
+                ? "1 produto foi atualizado"
+                : `${updatesCount} produtos foram atualizados`}
+            </span>
           </div>
-          <span className="notif-close" onClick={() => setShowBanner(false)}>✕</span>
+          <span className="notif-close" onClick={handleCloseBanner}>✕</span>
         </div>
       )}
 

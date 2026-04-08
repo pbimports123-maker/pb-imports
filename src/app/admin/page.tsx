@@ -1,43 +1,83 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-type TickerItem = { name: string; val: string; change: string; up: boolean };
-type Activity = { type: "entry" | "exit"; name: string; meta: string; qty: string };
+/* ─── Tipos ─────────────────────────────────────────── */
+type Activity = {
+  type: "entry" | "exit";
+  name: string;
+  brand: string;
+  meta: string;
+  qty: string;
+};
 
-const TICKER_DATA: TickerItem[] = [
-  { name: "TIRZEP-5MG", val: "R$330", change: "+2.1%", up: true },
-  { name: "SEMAGL-10MG", val: "R$420", change: "+0.8%", up: true },
-  { name: "RETATR-20MG", val: "R$1.200", change: "-1.2%", up: false },
-  { name: "BPC157-10MG", val: "R$450", change: "+3.4%", up: true },
-  { name: "IPAMORL-5MG", val: "R$360", change: "+0.5%", up: true },
-  { name: "NAD+-500MG", val: "R$570", change: "-0.3%", up: false },
-  { name: "TB500-10MG", val: "R$490", change: "+1.1%", up: true },
-  { name: "EPITHAL-50MG", val: "R$1.200", change: "+4.2%", up: true },
-];
+type DayBar = {
+  label: string;
+  entries: number;
+  exits: number;
+};
 
-const ACTIVITIES: Activity[] = [
-  { type: "entry", name: "Tirzepatida 60mg - Gen", meta: "Há 2h · Admin PB", qty: "+10" },
-  { type: "entry", name: "BPC-157 10mg - Neuroceptix", meta: "Há 2h · Admin PB", qty: "+10" },
-  { type: "entry", name: "Retatrutida 40mg - HP", meta: "Há 3h · Admin PB", qty: "+10" },
-  { type: "exit", name: "Semaglutida 5mg - ZPHCD", meta: "Há 4h · Admin PB", qty: "-5" },
-  { type: "entry", name: "Ipamorelin 10mg - Neuroceptix", meta: "Há 5h · Admin PB", qty: "+10" },
-  { type: "exit", name: "PT-141 10mg - Atlas", meta: "Há 6h · Admin PB", qty: "-3" },
-  { type: "entry", name: "NAD+ 500mg - ZPHC", meta: "Há 7h · Admin PB", qty: "+20" },
-  { type: "entry", name: "Epithalon 50mg - Neuroceptix", meta: "Há 8h · Admin PB", qty: "+5" },
-];
+type TickerItem = {
+  name: string;
+  val: string;
+  change: string;
+  up: boolean;
+};
 
+type ChartPeriod = "7D" | "1M" | "3M";
+
+/* ─── Helpers ────────────────────────────────────────── */
+const DAYS_PT = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
+
+function periodDays(period: ChartPeriod): number {
+  return period === "7D" ? 7 : period === "1M" ? 30 : 90;
+}
+
+function buildDayLabels(days: number): { iso: string; label: string }[] {
+  const result: { iso: string; label: string }[] = [];
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    result.push({
+      iso: d.toISOString().slice(0, 10),
+      label: days === 7 ? DAYS_PT[d.getDay()] : `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`,
+    });
+  }
+  return result;
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 60) return "Agora";
+  if (diff < 3600) return `Há ${Math.floor(diff / 60)}min`;
+  if (diff < 86400) return `Há ${Math.floor(diff / 3600)}h`;
+  return `Há ${Math.floor(diff / 86400)}d`;
+}
+
+/* ─── Componente ─────────────────────────────────────── */
 export default function AdminDashboard() {
   const [kpi, setKpi] = useState({ total: 0, emEstoque: 0, emFalta: 0, valor: 0 });
   const [displayKpi, setDisplayKpi] = useState({ total: 0, emEstoque: 0, emFalta: 0, valor: 0 });
-  const [loadingKpi, setLoadingKpi] = useState(false);
+  const [loadingKpi, setLoadingKpi] = useState(true);
+
+  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>("7D");
+  const [chartData, setChartData] = useState<DayBar[]>([]);
+  const [loadingChart, setLoadingChart] = useState(true);
+
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(true);
+
+  const [ticker, setTicker] = useState<TickerItem[]>([]);
+
   const rafRef = useRef<number | null>(null);
 
+  /* ── Relógio ── */
   useEffect(() => {
     const clockEl = document.getElementById("clock");
     const dateEl = document.getElementById("date-display");
-    const updateClock = () => {
+    const update = () => {
       const now = new Date();
       if (clockEl) clockEl.textContent = now.toTimeString().slice(0, 8);
       if (dateEl)
@@ -45,11 +85,12 @@ export default function AdminDashboard() {
           .toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })
           .toUpperCase();
     };
-    updateClock();
-    const clockTimer = setInterval(updateClock, 1000);
-    return () => clearInterval(clockTimer);
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
   }, []);
 
+  /* ── KPIs ── */
   useEffect(() => {
     async function load() {
       try {
@@ -65,7 +106,7 @@ export default function AdminDashboard() {
         const valor = data.reduce((sum, p) => sum + (Number(p.price) || 0) * (p.stock || 0), 0);
         setKpi({ total, emEstoque, emFalta, valor });
       } catch (err: any) {
-        console.error("KPI load error", err);
+        console.error("KPI error:", err.message);
       } finally {
         setLoadingKpi(false);
       }
@@ -73,6 +114,7 @@ export default function AdminDashboard() {
     load();
   }, []);
 
+  /* ── Animação KPI ── */
   useEffect(() => {
     if (loadingKpi) return;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -82,12 +124,12 @@ export default function AdminDashboard() {
     const start = performance.now();
     const step = (now: number) => {
       const progress = Math.min((now - start) / duration, 1);
-      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const ease = 1 - Math.pow(1 - progress, 3);
       setDisplayKpi({
-        total: Math.round(from.total + (to.total - from.total) * easeOut),
-        emEstoque: Math.round(from.emEstoque + (to.emEstoque - from.emEstoque) * easeOut),
-        emFalta: Math.round(from.emFalta + (to.emFalta - from.emFalta) * easeOut),
-        valor: Math.round(from.valor + (to.valor - from.valor) * easeOut),
+        total: Math.round(from.total + (to.total - from.total) * ease),
+        emEstoque: Math.round(from.emEstoque + (to.emEstoque - from.emEstoque) * ease),
+        emFalta: Math.round(from.emFalta + (to.emFalta - from.emFalta) * ease),
+        valor: Math.round(from.valor + (to.valor - from.valor) * ease),
       });
       if (progress < 1) rafRef.current = requestAnimationFrame(step);
     };
@@ -95,6 +137,205 @@ export default function AdminDashboard() {
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [kpi, loadingKpi]);
 
+  /* ── Gráfico ── */
+  const loadChart = useCallback(async (period: ChartPeriod) => {
+    try {
+      setLoadingChart(true);
+      const days = periodDays(period);
+      const since = new Date();
+      since.setDate(since.getDate() - days);
+
+      const { data, error } = await supabase
+        .from("stock_movements")
+        .select("type, quantity, created_at")
+        .gte("created_at", since.toISOString())
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+
+      const labels = buildDayLabels(days);
+      const map: Record<string, { entries: number; exits: number }> = {};
+      labels.forEach(({ iso }) => { map[iso] = { entries: 0, exits: 0 }; });
+
+      (data || []).forEach((row) => {
+        const iso = row.created_at.slice(0, 10);
+        if (!map[iso]) return;
+        const qty = Math.abs(row.quantity || 0);
+        if (row.type === "IN") map[iso].entries += qty;
+        else if (row.type === "OUT") map[iso].exits += qty;
+      });
+
+      // Para períodos longos, agrupar em semanas/blocos de 7 para não sobrecarregar o gráfico
+      const MAX_BARS = 7;
+      if (labels.length <= MAX_BARS) {
+        setChartData(labels.map(({ iso, label }) => ({ label, ...map[iso] })));
+      } else {
+        const step = Math.ceil(labels.length / MAX_BARS);
+        const grouped: DayBar[] = [];
+        for (let i = 0; i < labels.length; i += step) {
+          const chunk = labels.slice(i, i + step);
+          const entries = chunk.reduce((s, { iso }) => s + (map[iso]?.entries || 0), 0);
+          const exits = chunk.reduce((s, { iso }) => s + (map[iso]?.exits || 0), 0);
+          grouped.push({ label: chunk[0].label, entries, exits });
+        }
+        setChartData(grouped);
+      }
+    } catch (err: any) {
+      console.error("Chart error:", err.message);
+    } finally {
+      setLoadingChart(false);
+    }
+  }, []);
+
+  useEffect(() => { loadChart(chartPeriod); }, [chartPeriod, loadChart]);
+
+  /* ── Atividades ── */
+  useEffect(() => {
+    async function load() {
+      try {
+        setLoadingActivities(true);
+        const { data, error } = await supabase
+          .from("stock_movements")
+          .select("type, quantity, created_at, products(name, brand)")
+          .order("created_at", { ascending: false })
+          .limit(8);
+
+        if (error) throw error;
+
+        const list: Activity[] = (data || []).map((row: any) => {
+          const isEntry = row.type === "IN";
+          const qty = Math.abs(row.quantity || 0);
+          return {
+            type: isEntry ? "entry" : "exit",
+            name: row.products?.name || "Produto",
+            brand: row.products?.brand || "",
+            meta: `${timeAgo(row.created_at)} · Admin PB`,
+            qty: isEntry ? `+${qty}` : `-${qty}`,
+          };
+        });
+        setActivities(list);
+      } catch (err: any) {
+        console.error("Activities error:", err.message);
+      } finally {
+        setLoadingActivities(false);
+      }
+    }
+    load();
+  }, []);
+
+  /* ── Ticker (preços reais) ── */
+  useEffect(() => {
+    async function load() {
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select("name, price, old_price")
+          .eq("is_active", true)
+          .order("price", { ascending: false })
+          .limit(8);
+
+        if (error) throw error;
+
+        const items: TickerItem[] = (data || []).map((p) => {
+          const price = Number(p.price) || 0;
+          const old = Number(p.old_price) || price;
+          const diff = old > 0 ? ((price - old) / old) * 100 : 0;
+          const up = diff >= 0;
+          const shortName = p.name.length > 14 ? p.name.slice(0, 14).toUpperCase() : p.name.toUpperCase();
+          return {
+            name: shortName,
+            val: `R$${price.toLocaleString("pt-BR")}`,
+            change: `${up ? "+" : ""}${diff.toFixed(1)}%`,
+            up,
+          };
+        });
+        setTicker(items.length > 0 ? items : []);
+      } catch (err: any) {
+        console.error("Ticker error:", err.message);
+      }
+    }
+    load();
+  }, []);
+
+  /* ── Renderização do gráfico SVG ── */
+  const renderChart = () => {
+    if (loadingChart) {
+      return (
+        <text x="340" y="110" textAnchor="middle" fontFamily="DM Sans, sans-serif" fontSize="13" fill="#A8978E">
+          Carregando...
+        </text>
+      );
+    }
+    if (!chartData.length) {
+      return (
+        <text x="340" y="110" textAnchor="middle" fontFamily="DM Sans, sans-serif" fontSize="13" fill="#A8978E">
+          Sem movimentações no período
+        </text>
+      );
+    }
+
+    const H = 210; // altura útil das barras
+    const maxVal = Math.max(...chartData.flatMap((d) => [d.entries, d.exits]), 1);
+    const totalBars = chartData.length;
+    const slotW = 680 / totalBars;
+    const barW = Math.min(22, slotW * 0.35);
+
+    const gridVals = [maxVal, maxVal * 0.75, maxVal * 0.5, maxVal * 0.25, 0];
+
+    return (
+      <>
+        {/* Grid lines + Y labels */}
+        {gridVals.map((v, i) => {
+          const y = i * (H / 4);
+          return (
+            <g key={i}>
+              <line x1="28" y1={y} x2="680" y2={y} stroke="rgba(194,130,102,0.1)" strokeWidth="1" strokeDasharray="4 4" />
+              <text x="0" y={y + 4} fontFamily="DM Sans, sans-serif" fontSize="9" fill="#B0A090">
+                {Math.round(v)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Barras */}
+        {chartData.map((d, i) => {
+          const cx = 30 + i * slotW + slotW / 2;
+          const entryH = Math.max(d.entries > 0 ? 4 : 0, (d.entries / maxVal) * H);
+          const exitH = Math.max(d.exits > 0 ? 4 : 0, (d.exits / maxVal) * H);
+          const entryY = H - entryH;
+          const exitY = H - exitH;
+
+          return (
+            <g key={i}>
+              {/* Entrada */}
+              <rect x={cx - barW - 2} y={entryY} width={barW} height={entryH} fill="#C28266" rx="3" opacity="0.85">
+                <animate attributeName="y" from={H} to={entryY} dur="0.7s" fill="freeze" begin={`${i * 0.05}s`} />
+                <animate attributeName="height" from="0" to={entryH} dur="0.7s" fill="freeze" begin={`${i * 0.05}s`} />
+              </rect>
+              {/* Saída */}
+              <rect x={cx + 2} y={exitY} width={barW} height={exitH} fill="#7AAF90" rx="3" opacity="0.8">
+                <animate attributeName="y" from={H} to={exitY} dur="0.7s" fill="freeze" begin={`${i * 0.05 + 0.05}s`} />
+                <animate attributeName="height" from="0" to={exitH} dur="0.7s" fill="freeze" begin={`${i * 0.05 + 0.05}s`} />
+              </rect>
+              {/* X label */}
+              <text
+                x={cx}
+                y={H + 14}
+                fontFamily="DM Sans, sans-serif"
+                fontSize="9"
+                fill="#A8978E"
+                textAnchor="middle"
+              >
+                {d.label}
+              </text>
+            </g>
+          );
+        })}
+      </>
+    );
+  };
+
+  /* ── JSX ─────────────────────────────────────────────── */
   return (
     <div className="page">
 
@@ -111,24 +352,25 @@ export default function AdminDashboard() {
       </div>
 
       {/* ── Ticker ── */}
-      <div className="ticker">
-        <div className="ticker-inner">
-          {[...TICKER_DATA, ...TICKER_DATA].map((t, idx) => (
-            <span className="ticker-item" key={`${t.name}-${idx}`}>
-              <span className="t-name">{t.name}</span>
-              <span className="t-val">{t.val}</span>
-              <span className={t.up ? "t-up" : "t-down"}>{t.change}</span>
-            </span>
-          ))}
+      {ticker.length > 0 && (
+        <div className="ticker">
+          <div className="ticker-inner">
+            {[...ticker, ...ticker].map((t, idx) => (
+              <span className="ticker-item" key={`${t.name}-${idx}`}>
+                <span className="t-name">{t.name}</span>
+                <span className="t-val">{t.val}</span>
+                <span className={t.up ? "t-up" : "t-down"}>{t.change}</span>
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── KPIs ── */}
       <div className="kpi-grid">
         <div className="kpi-card terra">
           <div className="kpi-header">
             <div className="kpi-icon">📦</div>
-            <span className="kpi-badge badge-new">+12 novos</span>
           </div>
           <div className="kpi-label">Total de Produtos</div>
           <div className="kpi-value">{loadingKpi ? "..." : displayKpi.total}</div>
@@ -140,19 +382,18 @@ export default function AdminDashboard() {
           <div className="kpi-label">Em Estoque</div>
           <div className="kpi-value">{loadingKpi ? "..." : displayKpi.emEstoque}</div>
           <div className="kpi-bar">
-            <div className="kpi-bar-fill" style={{ width: `${Math.min(100, (kpi.total ? kpi.emEstoque / kpi.total : 0) * 100)}%` }}></div>
+            <div className="kpi-bar-fill" style={{ width: `${Math.min(100, kpi.total ? (kpi.emEstoque / kpi.total) * 100 : 0)}%` }}></div>
           </div>
         </div>
 
         <div className="kpi-card red">
           <div className="kpi-header">
             <div className="kpi-icon">⚠️</div>
-            <span className="kpi-badge badge-warn">5% aumento</span>
           </div>
           <div className="kpi-label">Produtos em Falta</div>
           <div className="kpi-value">{loadingKpi ? "..." : displayKpi.emFalta}</div>
           <div className="kpi-bar">
-            <div className="kpi-bar-fill" style={{ width: `${Math.min(100, (kpi.total ? kpi.emFalta / kpi.total : 0) * 100)}%` }}></div>
+            <div className="kpi-bar-fill" style={{ width: `${Math.min(100, kpi.total ? (kpi.emFalta / kpi.total) * 100 : 0)}%` }}></div>
           </div>
         </div>
 
@@ -174,59 +415,20 @@ export default function AdminDashboard() {
           <div className="panel-header">
             <span className="panel-title">Movimentações de Estoque</span>
             <div className="panel-controls">
-              <button className="ctrl-btn active">7D</button>
-              <button className="ctrl-btn">1M</button>
-              <button className="ctrl-btn">3M</button>
+              {(["7D", "1M", "3M"] as ChartPeriod[]).map((p) => (
+                <button
+                  key={p}
+                  className={`ctrl-btn ${chartPeriod === p ? "active" : ""}`}
+                  onClick={() => setChartPeriod(p)}
+                >
+                  {p}
+                </button>
+              ))}
             </div>
           </div>
           <div className="chart-area">
-            <svg className="chart-svg" viewBox="0 0 680 220" preserveAspectRatio="none">
-              {/* Grid lines */}
-              {[0, 55, 110, 165, 220].map((y) => (
-                <line key={y} x1="28" y1={y} x2="680" y2={y} stroke="rgba(194,130,102,0.1)" strokeWidth="1" strokeDasharray="4 4" />
-              ))}
-
-              {/* Y labels */}
-              {[{ y: 8, label: "100" }, { y: 63, label: "75" }, { y: 118, label: "50" }, { y: 173, label: "25" }, { y: 216, label: "0" }].map((t, i) => (
-                <text key={i} x="0" y={t.y} fontFamily="DM Sans, sans-serif" fontSize="9" fill="#B0A090">{t.label}</text>
-              ))}
-
-              {/* Entradas — terracota */}
-              {[
-                { x: 40, y: 132, h: 88, d: 0 },
-                { x: 128, y: 148, h: 72, d: 0.1 },
-                { x: 216, y: 110, h: 110, d: 0.15 },
-                { x: 304, y: 0, h: 220, d: 0.2 },
-                { x: 392, y: 148, h: 72, d: 0.25 },
-                { x: 480, y: 110, h: 110, d: 0.3 },
-                { x: 568, y: 132, h: 88, d: 0.35 },
-              ].map((b, i) => (
-                <rect key={`e${i}`} x={b.x} y={b.y} width="24" height={b.h} fill="#C28266" rx="4" opacity="0.85">
-                  <animate attributeName="y" from="220" to={b.y} dur="0.8s" fill="freeze" begin={`${b.d}s`} />
-                  <animate attributeName="height" from="0" to={b.h} dur="0.8s" fill="freeze" begin={`${b.d}s`} />
-                </rect>
-              ))}
-
-              {/* Saídas — sage */}
-              {[
-                { x: 66, y: 165, h: 55, d: 0.05 },
-                { x: 154, y: 187, h: 33, d: 0.12 },
-                { x: 242, y: 155, h: 65, d: 0.17 },
-                { x: 330, y: 110, h: 110, d: 0.22 },
-                { x: 418, y: 99, h: 121, d: 0.27 },
-                { x: 506, y: 99, h: 121, d: 0.32 },
-                { x: 594, y: 132, h: 88, d: 0.37 },
-              ].map((b, i) => (
-                <rect key={`s${i}`} x={b.x} y={b.y} width="24" height={b.h} fill="#7AAF90" rx="4" opacity="0.8">
-                  <animate attributeName="y" from="220" to={b.y} dur="0.8s" fill="freeze" begin={`${b.d}s`} />
-                  <animate attributeName="height" from="0" to={b.h} dur="0.8s" fill="freeze" begin={`${b.d}s`} />
-                </rect>
-              ))}
-
-              {/* X labels */}
-              {["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"].map((d, i) => (
-                <text key={d} x={53 + i * 88} y="215" fontFamily="DM Sans, sans-serif" fontSize="9" fill="#A8978E" textAnchor="middle">{d}</text>
-              ))}
+            <svg className="chart-svg" viewBox="0 0 680 230" preserveAspectRatio="none">
+              {renderChart()}
             </svg>
           </div>
           <div className="chart-legend">
@@ -245,19 +447,28 @@ export default function AdminDashboard() {
         <div className="panel activity-panel">
           <div className="panel-header">
             <span className="panel-title">Atividades Recentes</span>
-            <button className="ctrl-btn">Ver Tudo</button>
           </div>
           <div className="activity-list">
-            {ACTIVITIES.map((a, i) => (
-              <div className="activity-item" key={`${a.name}-${i}`}>
-                <div className={`activity-icon ${a.type}`}>{a.type === "entry" ? "↑" : "↓"}</div>
-                <div className="activity-info">
-                  <div className="activity-name">{a.name}</div>
-                  <div className="activity-meta">{a.meta}</div>
-                </div>
-                <div className={`activity-qty ${a.type === "exit" ? "out" : ""}`}>{a.qty}</div>
+            {loadingActivities ? (
+              <div style={{ padding: "24px", textAlign: "center", color: "#A8978E", fontSize: 13 }}>
+                Carregando...
               </div>
-            ))}
+            ) : activities.length === 0 ? (
+              <div style={{ padding: "24px", textAlign: "center", color: "#A8978E", fontSize: 13 }}>
+                Nenhuma atividade recente
+              </div>
+            ) : (
+              activities.map((a, i) => (
+                <div className="activity-item" key={i}>
+                  <div className={`activity-icon ${a.type}`}>{a.type === "entry" ? "↑" : "↓"}</div>
+                  <div className="activity-info">
+                    <div className="activity-name">{a.name}{a.brand ? ` – ${a.brand}` : ""}</div>
+                    <div className="activity-meta">{a.meta}</div>
+                  </div>
+                  <div className={`activity-qty ${a.type === "exit" ? "out" : ""}`}>{a.qty}</div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -299,10 +510,6 @@ export default function AdminDashboard() {
         .kpi-card.sage .kpi-icon { background: rgba(122,175,144,0.1); border: 1px solid rgba(122,175,144,0.25); }
         .kpi-card.red .kpi-icon { background: rgba(192,97,79,0.1); border: 1px solid rgba(192,97,79,0.25); }
         .kpi-card.amber .kpi-icon { background: rgba(212,169,106,0.1); border: 1px solid rgba(212,169,106,0.25); }
-
-        .kpi-badge { font-family: "DM Sans", sans-serif; font-size: 10px; font-weight: 600; padding: 3px 8px; border: 1px solid; border-radius: 20px; letter-spacing: 0.3px; }
-        .badge-new { border-color: rgba(122,175,144,0.5); color: #5A8F70; background: rgba(122,175,144,0.1); }
-        .badge-warn { border-color: rgba(192,97,79,0.4); color: #C0614F; background: rgba(192,97,79,0.08); }
 
         .kpi-label { font-family: "DM Sans", sans-serif; font-size: 11px; color: #A8978E; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
         .kpi-value { font-family: "Raleway", sans-serif; font-size: 34px; font-weight: 700; line-height: 1; }

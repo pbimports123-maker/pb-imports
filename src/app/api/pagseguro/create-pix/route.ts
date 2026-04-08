@@ -7,16 +7,14 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const PAGSEGURO_EMAIL = process.env.PAGSEGURO_EMAIL!;
-const PAGSEGURO_TOKEN = process.env.PAGSEGURO_TOKEN!;
-const PAGSEGURO_BASE_URL = "https://ws.pagseguro.uol.com.br";
+const ASAAS_API_KEY = process.env.ASAAS_API_KEY!;
+const ASAAS_BASE_URL = "https://api.asaas.com/v3";
 
 export async function POST(req: NextRequest) {
   try {
     const { orderId } = await req.json();
     if (!orderId) return NextResponse.json({ error: "orderId obrigatório" }, { status: 400 });
 
-    // 1. Busca pedido + itens
     const { data: order, error: orderErr } = await supabaseAdmin
       .from("orders")
       .select("*, order_items(*)")
@@ -27,111 +25,108 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
     }
 
-    // 2. Monta os itens no formato PagSeguro v2
-    const items = order.order_items.map((item: any, index: number) => ({
-      [`itemId${index + 1}`]: item.product_id.slice(0, 36),
-      [`itemDescription${index + 1}`]: item.product_name.slice(0, 100),
-      [`itemAmount${index + 1}`]: Number(item.product_price).toFixed(2),
-      [`itemQuantity${index + 1}`]: item.quantity,
-    }));
-
-    const itemsFlat = items.reduce((acc: any, item: any) => ({ ...acc, ...item }), {});
-
-    // 3. Monta o payload no formato URLEncoded (API v2)
-    const phone = order.customer_phone.replace(/\D/g, "");
     const cpf = order.customer_cpf.replace(/\D/g, "");
-    const zip = order.address_zip.replace(/\D/g, "");
+    const phone = order.customer_phone.replace(/\D/g, "");
 
-    const params: Record<string, string> = {
-      email: PAGSEGURO_EMAIL,
-      token: PAGSEGURO_TOKEN,
-      paymentMode: "default",
-      paymentMethod: "pix",
-      receiverEmail: PAGSEGURO_EMAIL,
-      currency: "BRL",
-      notificationURL: `${process.env.NEXT_PUBLIC_APP_URL}/api/pagseguro/webhook`,
-      reference: orderId,
+    let asaasCustomerId = order.asaas_customer_id || null;
 
-      // Cliente
-      senderName: order.customer_name,
-      senderCPF: cpf,
-      senderAreaCode: phone.slice(0, 2),
-      senderPhone: phone.slice(2),
-      senderEmail: `${cpf}@sandbox.pagseguro.com.br`,
+    if (!asaasCustomerId) {
+      const searchRes = await fetch(`${ASAAS_BASE_URL}/customers?cpfCnpj=${cpf}`, {
+        headers: { "access_token": ASAAS_API_KEY, "Content-Type": "application/json" },
+      });
+      const searchData = await searchRes.json();
 
-      // Endereço de entrega
-      shippingAddressStreet: order.address_street,
-      shippingAddressNumber: order.address_number,
-      shippingAddressComplement: order.address_complement || "N/A",
-      shippingAddressDistrict: order.address_district,
-      shippingAddressPostalCode: zip,
-      shippingAddressCity: order.address_city,
-      shippingAddressState: order.address_state,
-      shippingAddressCountry: "BRA",
-      shippingType: "3", // 1=PAC, 2=SEDEX, 3=Outro
-      shippingCost: Number(order.shipping_price).toFixed(2),
-
-      // Extras
-      extraAmount: Number(order.insurance_price).toFixed(2),
-
-      // Configurações
-      timeout: "25",
-      ...itemsFlat,
-    };
-
-    const body = new URLSearchParams(params).toString();
-
-    // 4. Chama API PagSeguro v2
-    const psRes = await fetch(`${PAGSEGURO_BASE_URL}/v2/transactions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-      },
-      body,
-    });
-
-    const psText = await psRes.text();
-    console.log("PagSeguro response:", psText);
-
-    if (!psRes.ok) {
-      console.error("PagSeguro error:", psText);
-      return NextResponse.json(
-        { error: "Erro no PagSeguro: " + psText },
-        { status: 400 }
-      );
+      if (searchData.data?.length > 0) {
+        asaasCustomerId = searchData.data[0].id;
+      } else {
+        const customerRes = await fetch(`${ASAAS_BASE_URL}/customers`, {
+          method: "POST",
+          headers: { "access_token": ASAAS_API_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: order.customer_name,
+            cpfCnpj: cpf,
+            mobilePhone: phone,
+            email: order.customer_email || undefined,
+            address: order.address_street,
+            addressNumber: order.address_number,
+            complement: order.address_complement || undefined,
+            province: order.address_district,
+            postalCode: order.address_zip.replace(/\D/g, ""),
+            city: order.address_city,
+            state: order.address_state,
+          }),
+        });
+        const customerData = await customerRes.json();
+        if (!customerRes.ok) {
+          return NextResponse.json({ error: "Erro ao criar cliente", details: customerData }, { status: 400 });
+        }
+        asaasCustomerId = customerData.id;
+        await supabaseAdmin.from("orders").update({ asaas_customer_id: asaasCustomerId }).eq("id", orderId);
+      }
     }
 
-    // 5. Parse da resposta (XML ou JSON)
-    let transactionCode = "";
-    let qrcodeText = "";
-    let qrcodeBase64 = "";
+    const subtotal = order.order_items.reduce(
+      (sum: number, item: any) => sum + Number(item.product_price) * item.quantity, 0
+    );
+    const shipping = Number(order.shipping_price) || 0;
+    const insurance = Number(order.insurance_price) || 0;
+    const total = subtotal + shipping + insurance;
 
-    // API v2 retorna XML — faz parse simples
-    const codeMatch = psText.match(/<code>(.*?)<\/code>/);
-    const pixMatch = psText.match(/<paymentLink>(.*?)<\/paymentLink>/);
-    const qrMatch = psText.match(/<qrcode>(.*?)<\/qrcode>/);
-    const qrImageMatch = psText.match(/<qrcodeImage>(.*?)<\/qrcodeImage>/);
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 1);
+    const dueDateStr = dueDate.toISOString().slice(0, 10);
 
-    transactionCode = codeMatch?.[1] || "";
-    qrcodeText = qrMatch?.[1] || pixMatch?.[1] || "";
-    qrcodeBase64 = qrImageMatch?.[1] || "";
+    const chargeRes = await fetch(`${ASAAS_BASE_URL}/payments`, {
+      method: "POST",
+      headers: { "access_token": ASAAS_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer: asaasCustomerId,
+        billingType: "PIX",
+        value: Number(total.toFixed(2)),
+        dueDate: dueDateStr,
+        description: `Pedido PB Imports #${orderId.slice(0, 8).toUpperCase()}`,
+        externalReference: orderId,
+      }),
+    });
 
-    // 6. Salva no Supabase
+    const chargeData = await chargeRes.json();
+    if (!chargeRes.ok) {
+      return NextResponse.json({ error: "Erro ao criar cobrança", details: chargeData }, { status: 400 });
+    }
+
+    const paymentId = chargeData.id;
+
+    const qrRes = await fetch(`${ASAAS_BASE_URL}/payments/${paymentId}/pixQrCode`, {
+      headers: { "access_token": ASAAS_API_KEY, "Content-Type": "application/json" },
+    });
+
+    const qrData = await qrRes.json();
+    if (!qrRes.ok) {
+      return NextResponse.json({ error: "Erro ao gerar QR Code", details: qrData }, { status: 400 });
+    }
+
+    const qrcodeText = qrData.payload || "";
+    const qrcodeBase64 = qrData.encodedImage || "";
+    const expirationDate = qrData.expirationDate || "";
+
     await supabaseAdmin.from("orders").update({
-      pagseguro_order_id: transactionCode,
+      pagseguro_order_id: paymentId,
       pagseguro_qrcode: qrcodeBase64,
       pagseguro_qrcode_text: qrcodeText,
+      asaas_payment_id: paymentId,
+      asaas_qrcode: qrcodeBase64,
+      asaas_qrcode_text: qrcodeText,
+      status: "pending",
     }).eq("id", orderId);
 
-    // 7. Notifica admin
     await notifyAdmin(order);
 
     return NextResponse.json({
       success: true,
       qrcode: qrcodeBase64,
       qrcodeText,
-      transactionCode,
+      paymentId,
+      expirationDate,
     });
 
   } catch (err: any) {
@@ -140,17 +135,23 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ── Notifica admin no WhatsApp ────────────────────────────────
 async function notifyAdmin(order: any) {
-  const UAZAPI_URL = process.env.UAZAPI_URL;
+  const UAZAPI_URL   = process.env.UAZAPI_URL;
   const UAZAPI_TOKEN = process.env.UAZAPI_TOKEN;
-  const ADMIN_PHONE = process.env.ADMIN_WHATSAPP;
+  const ADMIN_PHONE  = process.env.ADMIN_WHATSAPP;
 
   if (!UAZAPI_URL || !UAZAPI_TOKEN || !ADMIN_PHONE) return;
 
   const itemsList = order.order_items
-    .map((i: any) => `▸ ${i.quantity}x ${i.product_name} — R$ ${Number(i.subtotal).toFixed(2).replace(".", ",")}`)
+    .map((i: any) => `▸ ${i.quantity}x ${i.product_name} — R$ ${Number(i.product_price).toFixed(2).replace(".", ",")}`)
     .join("\n");
+
+  const subtotal = order.order_items.reduce(
+    (sum: number, item: any) => sum + Number(item.product_price) * item.quantity, 0
+  );
+  const shipping = Number(order.shipping_price) || 0;
+  const insurance = Number(order.insurance_price) || 0;
+  const total = subtotal + shipping + insurance;
 
   const message = `🛒 *NOVO PEDIDO — PB IMPORTS*
 
@@ -161,10 +162,10 @@ async function notifyAdmin(order: any) {
 📦 *Itens:*
 ${itemsList}
 
-💰 *Subtotal:* R$ ${Number(order.subtotal).toFixed(2).replace(".", ",")}
-🚚 *Frete (${order.shipping_type}):* R$ ${Number(order.shipping_price).toFixed(2).replace(".", ",")}
-${order.has_insurance ? `🔒 *Seguro:* R$ ${Number(order.insurance_price).toFixed(2).replace(".", ",")}\n` : ""}
-*💳 TOTAL: R$ ${Number(order.total).toFixed(2).replace(".", ",")}*
+💰 *Subtotal:* R$ ${subtotal.toFixed(2).replace(".", ",")}
+🚚 *Frete (${order.shipping_type}):* R$ ${shipping.toFixed(2).replace(".", ",")}
+${order.has_insurance ? `🔒 *Seguro:* R$ ${insurance.toFixed(2).replace(".", ",")}\n` : ""}
+*💳 TOTAL: R$ ${total.toFixed(2).replace(".", ",")}*
 
 🔔 Status: Aguardando Pix
 🔗 Pedido: ${process.env.NEXT_PUBLIC_APP_URL}/admin/pedidos/${order.id}`;
@@ -172,10 +173,7 @@ ${order.has_insurance ? `🔒 *Seguro:* R$ ${Number(order.insurance_price).toFix
   try {
     await fetch(`${UAZAPI_URL}/message/sendText/${ADMIN_PHONE}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        token: UAZAPI_TOKEN,
-      },
+      headers: { "Content-Type": "application/json", token: UAZAPI_TOKEN },
       body: JSON.stringify({ text: message }),
     });
   } catch (err) {

@@ -22,7 +22,6 @@ type Product = {
 type Status = "Ativo" | "Baixo" | "Falta";
 
 const PER_PAGE = 10;
-const DEFAULT_MAX = 50;
 
 const CAT_CLASS: Record<string, string> = {
   tirzepatida: "cat-tirz",
@@ -78,6 +77,12 @@ export default function AdminProductsPage() {
     }
   }
 
+  // ── Máximo dinâmico baseado no maior estoque real ──
+  const maxStock = useMemo(
+    () => Math.max(...products.map((p) => p.stock), 1),
+    [products]
+  );
+
   const filtered = useMemo(() => {
     const cat = chipFilter || filterCat;
     const maxPrice = filterPrice === "" ? Infinity : Number(filterPrice);
@@ -121,11 +126,12 @@ export default function AdminProductsPage() {
     return `cat-badge ${CAT_CLASS[cat.toLowerCase()] || ""}`;
   };
 
+  // ── barInfo agora usa maxStock dinâmico ──
   const barInfo = (stock: number) => {
-    const pct = Math.min(100, Math.round((stock / DEFAULT_MAX) * 100));
-    if (stock <= 0) return { pct, cls: "fill-out", text: `${stock} / ${DEFAULT_MAX} un` };
-    if (stock <= 5) return { pct: Math.max(pct, 8), cls: "fill-low", text: `${stock} / ${DEFAULT_MAX} un` };
-    return { pct: Math.max(pct, 12), cls: "fill-ok", text: `${stock} / ${DEFAULT_MAX} un` };
+    const pct = Math.min(100, Math.round((stock / maxStock) * 100));
+    if (stock <= 0) return { pct, cls: "fill-out", text: `0 un` };
+    if (stock <= 5) return { pct: Math.max(pct, 8), cls: "fill-low", text: `${stock} un` };
+    return { pct: Math.max(pct, 12), cls: "fill-ok", text: `${stock} un` };
   };
 
   async function handleDelete(id: string) {
