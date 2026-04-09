@@ -261,8 +261,8 @@ export default function Home() {
         .notif-close { margin-left: auto; color: var(--text-dim); font-size: 18px; cursor: pointer; padding: 4px; }
         .quick-links { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
         .quick-banner-icon { width: 36px; height: 36px; background: rgba(194,130,102,0.1); border: 1px solid var(--border-main); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-        .quick-banner-text strong { display: block; font-size: 15px; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
-        .quick-banner-text span { font-size: 12px; color: var(--text-muted); }
+        .quick-banner-text strong { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); }
+        .quick-banner-text span { font-size: 11px; color: var(--text-muted); }
         .info-strip { display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px; background: var(--bg-card2); border: 1px solid var(--border-dim); border-left: 3px solid var(--accent-terra); border-radius: 0 8px 8px 0; margin-bottom: 28px; font-size: 14px; line-height: 1.6; animation: slideIn 0.5s ease 0.2s both; }
         .info-strip .i-icon { font-size: 16px; margin-top: 2px; flex-shrink: 0; }
         .info-strip .cyan { color: var(--accent-terra); font-weight: 600; }
