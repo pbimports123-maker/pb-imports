@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       const { data: updatedRows, error: updateError } = await supabaseAdmin
         .from("orders")
         .update(paidPayload)
-        .select("id, payment_status, status")
+        .select("id, payment_status")
         .eq("id", orderId);
 
       if (updateError) {
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
       const { data: updatedRows, error: updateError } = await supabaseAdmin
         .from("orders")
         .update(expiredPayload)
-        .select("id, payment_status, status")
+        .select("id, payment_status")
         .eq("id", orderId);
 
       if (updateError) {
