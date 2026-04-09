@@ -33,7 +33,29 @@ export async function POST(req: NextRequest) {
         .eq("id", orderId)
         .single();
 
-      if (order) await notifyCustomer(order);
+      if (order) {
+        // Baixa de estoque para cada item do pedido
+        for (const item of order.order_items) {
+          const { data: product } = await supabaseAdmin
+            .from("products")
+            .select("id, stock")
+            .eq("id", item.product_id)
+            .single();
+
+          if (product) {
+            const newStock = Math.max(0, Number(product.stock) - Number(item.quantity));
+            await supabaseAdmin
+              .from("products")
+              .update({
+                stock: newStock,
+                is_out_of_stock: newStock <= 0,
+              })
+              .eq("id", item.product_id);
+          }
+        }
+
+        await notifyCustomer(order);
+      }
     }
 
     if (event === "PAYMENT_OVERDUE" || event === "PAYMENT_DELETED") {
