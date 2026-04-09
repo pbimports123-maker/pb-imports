@@ -477,7 +477,7 @@ export default function Home() {
             const totalProds = cat.brands.reduce((a, b) => a + b.products.length, 0);
             const outProds = cat.brands.reduce((a, b) => a + b.products.filter((p) => p.is_out_of_stock || (p.stock ?? 0) <= 0).length, 0);
             return (
-              <div className={`cat-block ${ci === 0 ? "open" : ""}`} key={cat.id} style={{ animationDelay: `${ci * 0.07}s` }}>
+              <div className={`cat-block`} key={cat.id} style={{ animationDelay: `${ci * 0.07}s` }}>
                 <div className="cat-header" onClick={(e) => { (e.currentTarget.parentElement as HTMLElement)?.classList.toggle("open"); }}>
                   <div className="cat-icon">{cat.abbr}</div>
                   <div className="cat-info">
