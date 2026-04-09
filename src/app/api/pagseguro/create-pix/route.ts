@@ -1,205 +1,48 @@
 // src/app/api/pagseguro/create-pix/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import * as https from "https";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const ASAAS_API_KEY = process.env.ASAAS_API_KEY!;
-const ASAAS_BASE_URL = "https://api.asaas.com/v3";
-
-// Fetch customizado que usa HTTP/1.1
-async function asaasFetch(url: string, options: any = {}): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const urlObj = new URL(url);
-    const agent = new https.Agent({ ALPNProtocols: ["http/1.1"] });
-
-    const reqOptions: https.RequestOptions = {
-      hostname: urlObj.hostname,
-      port: urlObj.port || 443,
-      path: urlObj.pathname + urlObj.search,
-      method: options.method || "GET",
-      headers: {
-        "accept": "application/json",
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
-      agent,
-    };
-
-    const body = options.body ? String(options.body) : null;
-    if (body) {
-      (reqOptions.headers as any)["Content-Length"] = Buffer.byteLength(body);
-    }
-
-    const req = https.request(reqOptions, (res) => {
-      const chunks: Buffer[] = [];
-      res.on("data", (chunk: Buffer) => chunks.push(chunk));
-      res.on("end", () => {
-        const raw = Buffer.concat(chunks).toString("utf8");
-        console.log(`[asaasFetch] ${reqOptions.method} ${urlObj.pathname} → ${res.statusCode} → ${raw.slice(0, 200)}`);
-        resolve({
-          ok: res.statusCode! >= 200 && res.statusCode! < 300,
-          status: res.statusCode,
-          json: async () => {
-            try { return JSON.parse(raw); }
-            catch { return {}; }
-          },
-          text: async () => raw,
-        });
-      });
-    });
-
-    req.on("error", (err) => {
-      console.error("[asaasFetch] error:", err);
-      reject(err);
-    });
-
-    if (body) req.write(body);
-    req.end();
-  });
-}
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export async function POST(req: NextRequest) {
   try {
     const { orderId } = await req.json();
     if (!orderId) return NextResponse.json({ error: "orderId obrigatório" }, { status: 400 });
 
-    const { data: order, error: orderErr } = await supabaseAdmin
+    // Chama a Edge Function do Supabase
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-pix`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ orderId }),
+    });
+
+    const data = await res.json();
+    console.log("Edge Function response:", JSON.stringify(data));
+
+    if (!res.ok) {
+      return NextResponse.json({ error: data.error || "Erro na Edge Function", details: data }, { status: res.status });
+    }
+
+    // Notifica admin no WhatsApp
+    const { data: order } = await supabaseAdmin
       .from("orders")
       .select("*, order_items(*)")
       .eq("id", orderId)
       .single();
 
-    if (orderErr || !order) {
-      return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
-    }
+    if (order) await notifyAdmin(order);
 
-    const cpf = order.customer_cpf.replace(/\D/g, "");
-    const phone = order.customer_phone.replace(/\D/g, "");
-
-    let asaasCustomerId = order.asaas_customer_id || null;
-
-    if (!asaasCustomerId) {
-      const searchRes = await asaasFetch(`${ASAAS_BASE_URL}/customers?cpfCnpj=${cpf}`, {
-        headers: { "access_token": ASAAS_API_KEY },
-      });
-      const searchData = await searchRes.json();
-      console.log("Search result:", JSON.stringify(searchData));
-
-      if (searchData.data?.length > 0) {
-        asaasCustomerId = searchData.data[0].id;
-      } else {
-        const customerRes = await asaasFetch(`${ASAAS_BASE_URL}/customers`, {
-          method: "POST",
-          headers: { "access_token": ASAAS_API_KEY },
-          body: JSON.stringify({
-            name: order.customer_name,
-            cpfCnpj: cpf,
-            mobilePhone: phone,
-            email: order.customer_email || undefined,
-            address: order.address_street,
-            addressNumber: order.address_number,
-            complement: order.address_complement || undefined,
-            province: order.address_district,
-            postalCode: order.address_zip.replace(/\D/g, ""),
-            city: order.address_city,
-            state: order.address_state,
-          }),
-        });
-        const customerData = await customerRes.json();
-        console.log("Create customer result:", JSON.stringify(customerData));
-        if (!customerRes.ok) {
-          // Se der erro de CPF/telefone, tenta criar com dados mínimos
-          const minimalRes = await asaasFetch(`${ASAAS_BASE_URL}/customers`, {
-            method: "POST",
-            headers: { "access_token": ASAAS_API_KEY },
-            body: JSON.stringify({
-              name: order.customer_name,
-              cpfCnpj: cpf,
-            }),
-          });
-          const minimalData = await minimalRes.json();
-          console.log("Minimal customer result:", JSON.stringify(minimalData));
-          if (!minimalRes.ok) {
-            return NextResponse.json({ error: "Erro ao criar cliente", details: minimalData }, { status: 400 });
-          }
-          asaasCustomerId = minimalData.id;
-        } else {
-          asaasCustomerId = customerData.id;
-        }
-        await supabaseAdmin.from("orders").update({ asaas_customer_id: asaasCustomerId }).eq("id", orderId);
-      }
-    }
-
-    const subtotal = order.order_items.reduce(
-      (sum: number, item: any) => sum + Number(item.product_price) * item.quantity, 0
-    );
-    const shipping = Number(order.shipping_price) || 0;
-    const insurance = Number(order.insurance_price) || 0;
-    const total = subtotal + shipping + insurance;
-
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 1);
-    const dueDateStr = dueDate.toISOString().slice(0, 10);
-
-    const chargeRes = await asaasFetch(`${ASAAS_BASE_URL}/payments`, {
-      method: "POST",
-      headers: { "access_token": ASAAS_API_KEY },
-      body: JSON.stringify({
-        customer: asaasCustomerId,
-        billingType: "PIX",
-        value: Number(total.toFixed(2)),
-        dueDate: dueDateStr,
-        description: `Pedido PB Imports #${orderId.slice(0, 8).toUpperCase()}`,
-        externalReference: orderId,
-      }),
-    });
-
-    const chargeData = await chargeRes.json();
-    console.log("Charge result:", JSON.stringify(chargeData));
-    if (!chargeRes.ok) {
-      return NextResponse.json({ error: "Erro ao criar cobrança", details: chargeData }, { status: 400 });
-    }
-
-    const paymentId = chargeData.id;
-
-    const qrRes = await asaasFetch(`${ASAAS_BASE_URL}/payments/${paymentId}/pixQrCode`, {
-      headers: { "access_token": ASAAS_API_KEY },
-    });
-
-    const qrData = await qrRes.json();
-    console.log("QR result:", JSON.stringify(qrData));
-    if (!qrRes.ok) {
-      return NextResponse.json({ error: "Erro ao gerar QR Code", details: qrData }, { status: 400 });
-    }
-
-    const qrcodeText = qrData.payload || "";
-    const qrcodeBase64 = qrData.encodedImage || "";
-    const expirationDate = qrData.expirationDate || "";
-
-    await supabaseAdmin.from("orders").update({
-      pagseguro_order_id: paymentId,
-      pagseguro_qrcode: qrcodeBase64,
-      pagseguro_qrcode_text: qrcodeText,
-      asaas_payment_id: paymentId,
-      asaas_qrcode: qrcodeBase64,
-      asaas_qrcode_text: qrcodeText,
-      status: "pending",
-    }).eq("id", orderId);
-
-    await notifyAdmin(order);
-
-    return NextResponse.json({
-      success: true,
-      qrcode: qrcodeBase64,
-      qrcodeText,
-      paymentId,
-      expirationDate,
-    });
+    return NextResponse.json(data);
 
   } catch (err: any) {
     console.error("create-pix error:", err);
