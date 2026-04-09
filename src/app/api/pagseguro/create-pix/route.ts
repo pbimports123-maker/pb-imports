@@ -1,6 +1,8 @@
 // src/app/api/pagseguro/create-pix/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import * as https from "https";
+import * as http from "http";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,6 +11,56 @@ const supabaseAdmin = createClient(
 
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY!;
 const ASAAS_BASE_URL = "https://api.asaas.com/v3";
+
+// Agente que força HTTP/1.1 para compatibilidade com Asaas
+const http1Agent = new https.Agent({ ALPNProtocols: ["http/1.1"] });
+
+// Fetch customizado que usa HTTP/1.1
+async function asaasFetch(url: string, options: any = {}): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const isHttps = urlObj.protocol === "https:";
+    const agent = isHttps ? http1Agent : new http.Agent();
+
+    const reqOptions = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || (isHttps ? 443 : 80),
+      path: urlObj.pathname + urlObj.search,
+      method: options.method || "GET",
+      headers: {
+        ...options.headers,
+        "Content-Type": "application/json",
+      },
+      agent,
+    };
+
+    const body = options.body ? String(options.body) : null;
+    if (body && reqOptions.headers) {
+      (reqOptions.headers as any)["Content-Length"] = Buffer.byteLength(body);
+    }
+
+    const lib = isHttps ? https : http;
+    const req = lib.request(reqOptions, (res) => {
+      let data = "";
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => {
+        resolve({
+          ok: res.statusCode! >= 200 && res.statusCode! < 300,
+          status: res.statusCode,
+          json: async () => {
+            try { return JSON.parse(data); }
+            catch { return {}; }
+          },
+          text: async () => data,
+        });
+      });
+    });
+
+    req.on("error", reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,17 +83,18 @@ export async function POST(req: NextRequest) {
     let asaasCustomerId = order.asaas_customer_id || null;
 
     if (!asaasCustomerId) {
-      const searchRes = await fetch(`${ASAAS_BASE_URL}/customers?cpfCnpj=${cpf}`, {
-        headers: { "access_token": ASAAS_API_KEY, "Content-Type": "application/json" },
+      const searchRes = await asaasFetch(`${ASAAS_BASE_URL}/customers?cpfCnpj=${cpf}`, {
+        headers: { "access_token": ASAAS_API_KEY },
       });
       const searchData = await searchRes.json();
+      console.log("Search result:", JSON.stringify(searchData));
 
       if (searchData.data?.length > 0) {
         asaasCustomerId = searchData.data[0].id;
       } else {
-        const customerRes = await fetch(`${ASAAS_BASE_URL}/customers`, {
+        const customerRes = await asaasFetch(`${ASAAS_BASE_URL}/customers`, {
           method: "POST",
-          headers: { "access_token": ASAAS_API_KEY, "Content-Type": "application/json" },
+          headers: { "access_token": ASAAS_API_KEY },
           body: JSON.stringify({
             name: order.customer_name,
             cpfCnpj: cpf,
@@ -57,10 +110,26 @@ export async function POST(req: NextRequest) {
           }),
         });
         const customerData = await customerRes.json();
+        console.log("Create customer result:", JSON.stringify(customerData));
         if (!customerRes.ok) {
-          return NextResponse.json({ error: "Erro ao criar cliente", details: customerData }, { status: 400 });
+          // Se der erro de CPF/telefone, tenta criar com dados mínimos
+          const minimalRes = await asaasFetch(`${ASAAS_BASE_URL}/customers`, {
+            method: "POST",
+            headers: { "access_token": ASAAS_API_KEY },
+            body: JSON.stringify({
+              name: order.customer_name,
+              cpfCnpj: cpf,
+            }),
+          });
+          const minimalData = await minimalRes.json();
+          console.log("Minimal customer result:", JSON.stringify(minimalData));
+          if (!minimalRes.ok) {
+            return NextResponse.json({ error: "Erro ao criar cliente", details: minimalData }, { status: 400 });
+          }
+          asaasCustomerId = minimalData.id;
+        } else {
+          asaasCustomerId = customerData.id;
         }
-        asaasCustomerId = customerData.id;
         await supabaseAdmin.from("orders").update({ asaas_customer_id: asaasCustomerId }).eq("id", orderId);
       }
     }
@@ -76,9 +145,9 @@ export async function POST(req: NextRequest) {
     dueDate.setDate(dueDate.getDate() + 1);
     const dueDateStr = dueDate.toISOString().slice(0, 10);
 
-    const chargeRes = await fetch(`${ASAAS_BASE_URL}/payments`, {
+    const chargeRes = await asaasFetch(`${ASAAS_BASE_URL}/payments`, {
       method: "POST",
-      headers: { "access_token": ASAAS_API_KEY, "Content-Type": "application/json" },
+      headers: { "access_token": ASAAS_API_KEY },
       body: JSON.stringify({
         customer: asaasCustomerId,
         billingType: "PIX",
@@ -90,17 +159,19 @@ export async function POST(req: NextRequest) {
     });
 
     const chargeData = await chargeRes.json();
+    console.log("Charge result:", JSON.stringify(chargeData));
     if (!chargeRes.ok) {
       return NextResponse.json({ error: "Erro ao criar cobrança", details: chargeData }, { status: 400 });
     }
 
     const paymentId = chargeData.id;
 
-    const qrRes = await fetch(`${ASAAS_BASE_URL}/payments/${paymentId}/pixQrCode`, {
-      headers: { "access_token": ASAAS_API_KEY, "Content-Type": "application/json" },
+    const qrRes = await asaasFetch(`${ASAAS_BASE_URL}/payments/${paymentId}/pixQrCode`, {
+      headers: { "access_token": ASAAS_API_KEY },
     });
 
     const qrData = await qrRes.json();
+    console.log("QR result:", JSON.stringify(qrData));
     if (!qrRes.ok) {
       return NextResponse.json({ error: "Erro ao gerar QR Code", details: qrData }, { status: 400 });
     }
