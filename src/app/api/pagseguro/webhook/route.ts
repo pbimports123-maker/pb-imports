@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const orderId = payment.externalReference;
 
     if (event === "PAYMENT_RECEIVED" || event === "PAYMENT_CONFIRMED") {
-      const paidPayload = { payment_status: "paid", status: "paid" };
+      const paidPayload = { payment_status: "paid" };
       console.log("Webhook updating order to paid:", {
         orderId,
         event,
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (event === "PAYMENT_OVERDUE" || event === "PAYMENT_DELETED") {
-      const expiredPayload = { payment_status: "expired", status: "cancelled" };
+      const expiredPayload = { payment_status: "expired" };
       console.log("Webhook updating order to expired:", {
         orderId,
         event,
