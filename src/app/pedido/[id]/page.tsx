@@ -262,7 +262,7 @@ export default function PedidoPage() {
                 </div>
                 <div className="paid-step">
                   <div className="paid-step-num">2</div>
-                  Separação e embalagem em até 48h úteis
+                  Separação e embalagem em até 72h úteis
                 </div>
                 <div className="paid-step">
                   <div className="paid-step-num">3</div>
@@ -364,7 +364,7 @@ export default function PedidoPage() {
           <div className="info-row"><span>Destinatário</span><strong>{order.customer_name}</strong></div>
           <div className="info-row"><span>Cidade</span><strong>{order.address_city} — {order.address_state}</strong></div>
           <div className="info-row"><span>Modalidade</span><strong>{order.shipping_type}</strong></div>
-          <div className="info-row"><span>Prazo</span><strong>48–72h úteis após confirmação</strong></div>
+          <div className="info-row"><span>Prazo de postagem</span><strong>até 72h úteis após confirmação</strong></div>
           {order.has_insurance && (
             <div className="info-row"><span>Seguro</span><strong style={{ color: "#5A8F70" }}>✓ Ativo (15%)</strong></div>
           )}

@@ -34,6 +34,8 @@ type FormData = {
   name: string;
   cpf: string;
   phone: string;
+  email: string;
+  birthdate: string;
   street: string;
   number: string;
   complement: string;
@@ -85,6 +87,7 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<"form" | "summary">("form");
   const [cepLoading, setCepLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   // Cupom
   const [couponCode, setCouponCode] = useState("");
@@ -92,7 +95,7 @@ export default function CheckoutPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
 
   const [form, setForm] = useState<FormData>({
-    name: "", cpf: "", phone: "",
+    name: "", cpf: "", phone: "", email: "", birthdate: "",
     street: "", number: "", complement: "",
     district: "", zip: "", city: "", state: "",
   });
@@ -153,7 +156,6 @@ export default function CheckoutPage() {
     setSelectedShipping(null);
   }, [hasInsurance, allShippingRates]);
 
-  // Cálculos com cupom
   const subtotal = cartItems.reduce((sum, i) => sum + Number(i.product.price) * i.quantity, 0);
   const shippingPrice = selectedShipping ? Number(selectedShipping.price) : 0;
   const insurancePrice = hasInsurance ? subtotal * 0.15 : 0;
@@ -168,7 +170,6 @@ export default function CheckoutPage() {
   const shippingFinal = appliedCoupon?.type === "free_shipping" ? 0 : shippingPrice;
   const total = subtotal + shippingFinal + insurancePrice - (appliedCoupon?.type === "percentage" ? couponDiscount : 0);
 
-  // Busca CEP
   const fetchCep = async (cep: string) => {
     try {
       setCepLoading(true);
@@ -202,7 +203,6 @@ export default function CheckoutPage() {
     }
   };
 
-  // Aplicar cupom
   const applyCoupon = async () => {
     if (!couponCode.trim()) return;
     setCouponLoading(true);
@@ -213,23 +213,10 @@ export default function CheckoutPage() {
         .eq("code", couponCode.trim().toUpperCase())
         .eq("is_active", true)
         .single();
-
-      if (error || !data) {
-        toast.error("Cupom inválido ou não encontrado");
-        return;
-      }
-
-      if (data.max_uses !== null && data.used_count >= data.max_uses) {
-        toast.error("Cupom esgotado");
-        return;
-      }
-
+      if (error || !data) { toast.error("Cupom inválido ou não encontrado"); return; }
+      if (data.max_uses !== null && data.used_count >= data.max_uses) { toast.error("Cupom esgotado"); return; }
       setAppliedCoupon(data);
-      toast.success(
-        data.type === "free_shipping"
-          ? "🎉 Frete grátis aplicado!"
-          : `🎉 Desconto de ${data.value}% aplicado!`
-      );
+      toast.success(data.type === "free_shipping" ? "🎉 Frete grátis aplicado!" : `🎉 Desconto de ${data.value}% aplicado!`);
     } catch {
       toast.error("Erro ao validar cupom");
     } finally {
@@ -244,22 +231,29 @@ export default function CheckoutPage() {
   };
 
   const validateForm = () => {
-    const required: (keyof FormData)[] = ["name","cpf","phone","street","number","district","zip","city","state"];
+    const required: (keyof FormData)[] = ["name","cpf","phone","email","birthdate","street","number","district","zip","city","state"];
     for (const f of required) {
       if (!form[f].trim()) {
         toast.error(`Preencha o campo: ${fieldLabel(f)}`);
         return false;
       }
     }
+    // Valida e-mail
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) {
+      toast.error("Digite um e-mail válido");
+      return false;
+    }
     if (!selectedShipping) { toast.error("Selecione uma opção de frete"); return false; }
     if (cartItems.length === 0) { toast.error("Seu carrinho está vazio"); return false; }
+    if (!acceptedTerms) { toast.error("Você precisa aceitar as regras de envio para continuar"); return false; }
     return true;
   };
 
   const fieldLabel = (f: keyof FormData) => ({
-    name: "Nome", cpf: "CPF", phone: "Telefone",
-    street: "Endereço", number: "Número", complement: "Complemento",
-    district: "Bairro", zip: "CEP", city: "Cidade", state: "Estado",
+    name: "Nome", cpf: "CPF", phone: "Telefone", email: "E-mail",
+    birthdate: "Data de nascimento", street: "Endereço", number: "Número",
+    complement: "Complemento", district: "Bairro", zip: "CEP", city: "Cidade", state: "Estado",
   }[f]);
 
   const goToSummary = () => { if (validateForm()) setStep("summary"); };
@@ -274,6 +268,8 @@ export default function CheckoutPage() {
           customer_name: form.name,
           customer_cpf: form.cpf,
           customer_phone: form.phone,
+          customer_email: form.email,
+          customer_birthdate: form.birthdate,
           address_street: form.street,
           address_number: form.number,
           address_complement: form.complement,
@@ -296,12 +292,8 @@ export default function CheckoutPage() {
         .single();
       if (orderErr) throw orderErr;
 
-      // Incrementa uso do cupom
       if (appliedCoupon) {
-        await supabase
-          .from("coupons")
-          .update({ used_count: appliedCoupon.used_count + 1 })
-          .eq("id", appliedCoupon.id);
+        await supabase.from("coupons").update({ used_count: appliedCoupon.used_count + 1 }).eq("id", appliedCoupon.id);
       }
 
       const orderItems = cartItems.map((i) => ({
@@ -412,7 +404,6 @@ export default function CheckoutPage() {
         .shipping-name { font-size: 14px; font-weight: 600; color: #0D0F13; }
         .shipping-desc { font-size: 12px; color: #A8978E; margin-top: 2px; }
         .shipping-price { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #C28266; }
-        .shipping-price.free { color: #5A8F70; text-decoration: line-through; }
         .no-state { font-size: 13px; color: #B0A090; text-align: center; padding: 20px 0; }
         .insurance-card { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border: 1.5px solid rgba(194,130,102,0.2); border-radius: 10px; cursor: pointer; transition: all 0.2s; }
         .insurance-card:hover { border-color: #C28266; }
@@ -421,6 +412,15 @@ export default function CheckoutPage() {
         .insurance-title { font-size: 14px; font-weight: 600; color: #0D0F13; margin-bottom: 4px; }
         .insurance-desc { font-size: 12px; color: #7A6558; line-height: 1.5; }
         .insurance-price { font-family: "Raleway", sans-serif; font-size: 14px; font-weight: 700; color: #C28266; margin-top: 6px; }
+
+        /* Aceite de termos */
+        .terms-card { display: flex; align-items: flex-start; gap: 14px; padding: 16px 20px; background: rgba(194,130,102,0.04); border: 1.5px solid rgba(194,130,102,0.2); border-radius: 10px; cursor: pointer; transition: all 0.2s; margin-bottom: 16px; }
+        .terms-card.accepted { border-color: #7AAF90; background: rgba(122,175,144,0.06); }
+        .terms-card input[type="checkbox"] { accent-color: #C28266; width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; cursor: pointer; }
+        .terms-text { font-size: 13px; color: #3A2E28; line-height: 1.5; }
+        .terms-link { color: #C28266; font-weight: 600; text-decoration: underline; }
+        .terms-link:hover { color: #9E6650; }
+
         .summary-card { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 14px; padding: 24px; position: sticky; top: 24px; }
         .summary-title { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #0D0F13; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 18px; }
         .summary-items { margin-bottom: 18px; }
@@ -507,6 +507,16 @@ export default function CheckoutPage() {
                     <input placeholder="(00) 00000-0000" value={form.phone} onChange={(e) => handleInput("phone", e.target.value)} />
                   </div>
                 </div>
+                <div className="form-row">
+                  <div className="field">
+                    <label>E-mail *</label>
+                    <input type="email" placeholder="seu@email.com" value={form.email} onChange={(e) => handleInput("email", e.target.value)} />
+                  </div>
+                  <div className="field">
+                    <label>Data de nascimento *</label>
+                    <input type="date" value={form.birthdate} onChange={(e) => handleInput("birthdate", e.target.value)} max={new Date().toISOString().split("T")[0]} />
+                  </div>
+                </div>
               </div>
 
               {/* Endereço */}
@@ -576,7 +586,7 @@ export default function CheckoutPage() {
                             {rate.service_type === "VIP" && "Entrega prioritária • 1 a 3 dias úteis"}
                           </div>
                         </div>
-                        <span className={`shipping-price ${appliedCoupon?.type === "free_shipping" ? "free" : ""}`}>
+                        <span className="shipping-price">
                           {appliedCoupon?.type === "free_shipping" ? "GRÁTIS" : `R$ ${Number(rate.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
                         </span>
                       </label>
@@ -590,13 +600,7 @@ export default function CheckoutPage() {
                 <div className="card-title"><Tag size={16} /> Cupom de Desconto</div>
                 {!appliedCoupon ? (
                   <div className="coupon-wrap">
-                    <input
-                      className="coupon-input"
-                      placeholder="Digite o código do cupom"
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                      onKeyDown={(e) => e.key === "Enter" && applyCoupon()}
-                    />
+                    <input className="coupon-input" placeholder="Digite o código do cupom" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && applyCoupon()} />
                     <button className="coupon-btn" onClick={applyCoupon} disabled={couponLoading || !couponCode.trim()}>
                       {couponLoading ? "..." : "Aplicar"}
                     </button>
@@ -607,14 +611,10 @@ export default function CheckoutPage() {
                       <CheckCircle size={18} color="#5A8F70" />
                       <div>
                         <div className="coupon-applied-code">{appliedCoupon.code}</div>
-                        <div className="coupon-applied-desc">
-                          {appliedCoupon.type === "free_shipping" ? "Frete grátis" : `${appliedCoupon.value}% de desconto`}
-                        </div>
+                        <div className="coupon-applied-desc">{appliedCoupon.type === "free_shipping" ? "Frete grátis" : `${appliedCoupon.value}% de desconto`}</div>
                       </div>
                     </div>
-                    <button className="coupon-remove" onClick={removeCoupon}>
-                      <X size={16} />
-                    </button>
+                    <button className="coupon-remove" onClick={removeCoupon}><X size={16} /></button>
                   </div>
                 )}
               </div>
@@ -636,6 +636,18 @@ export default function CheckoutPage() {
                   </div>
                 </label>
               </div>
+
+              {/* Aceite de Política */}
+              <label className={`terms-card ${acceptedTerms ? "accepted" : ""}`} onClick={() => setAcceptedTerms(v => !v)}>
+                <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} onClick={(e) => e.stopPropagation()} />
+                <span className="terms-text">
+                  Li e concordo com as{" "}
+                  <Link href="/regras" className="terms-link" target="_blank" onClick={(e) => e.stopPropagation()}>
+                    Regras de Envio
+                  </Link>{" "}
+                  e Políticas de Entrega da PB Imports. Estou ciente dos prazos, condições de pagamento e procedimentos em caso de extravio.
+                </span>
+              </label>
 
               <button className="btn-primary" onClick={goToSummary}>Ver resumo do pedido →</button>
             </div>
@@ -661,9 +673,7 @@ export default function CheckoutPage() {
                   <span>Frete ({selectedShipping?.service_type || "—"})</span>
                   <strong>{selectedShipping ? (appliedCoupon?.type === "free_shipping" ? "GRÁTIS" : `R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`) : "—"}</strong>
                 </div>
-                {hasInsurance && (
-                  <div className="summary-line"><span>🔒 Seguro (15%)</span><strong>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
-                )}
+                {hasInsurance && <div className="summary-line"><span>🔒 Seguro (15%)</span><strong>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>}
                 {appliedCoupon?.type === "percentage" && couponDiscount > 0 && (
                   <div className="summary-line discount"><span>🎟️ Cupom ({appliedCoupon.value}%)</span><strong>- R$ {couponDiscount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
                 )}
@@ -688,6 +698,8 @@ export default function CheckoutPage() {
               <div className="fs-row"><span>Nome</span><strong>{form.name}</strong></div>
               <div className="fs-row"><span>CPF</span><strong>{form.cpf}</strong></div>
               <div className="fs-row"><span>WhatsApp</span><strong>{form.phone}</strong></div>
+              <div className="fs-row"><span>E-mail</span><strong>{form.email}</strong></div>
+              <div className="fs-row"><span>Nascimento</span><strong>{form.birthdate ? new Date(form.birthdate + "T00:00:00").toLocaleDateString("pt-BR") : ""}</strong></div>
             </div>
             <div className="fs-section">
               <div className="fs-section-title">📍 Endereço de entrega</div>
@@ -708,15 +720,11 @@ export default function CheckoutPage() {
             <div className="fs-total-box">
               <div className="fs-total-row"><span>Subtotal produtos</span><strong>R$ {subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
               <div className="fs-total-row"><span>Frete {selectedShipping?.service_type}</span><strong>{appliedCoupon?.type === "free_shipping" ? "GRÁTIS" : `R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}</strong></div>
-              {hasInsurance && (
-                <div className="fs-total-row"><span>🔒 Seguro de envio (15%)</span><strong style={{ color: "#C0614F" }}>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
-              )}
+              {hasInsurance && <div className="fs-total-row"><span>🔒 Seguro de envio (15%)</span><strong style={{ color: "#C0614F" }}>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>}
               {appliedCoupon?.type === "percentage" && couponDiscount > 0 && (
                 <div className="fs-total-row"><span>🎟️ Cupom ({appliedCoupon.value}%)</span><strong style={{ color: "#5A8F70" }}>- R$ {couponDiscount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
               )}
-              {appliedCoupon && (
-                <div className="fs-total-row"><span>🎟️ Cupom aplicado</span><strong style={{ color: "#5A8F70" }}>{appliedCoupon.code}</strong></div>
-              )}
+              {appliedCoupon && <div className="fs-total-row"><span>🎟️ Cupom aplicado</span><strong style={{ color: "#5A8F70" }}>{appliedCoupon.code}</strong></div>}
               <div className="fs-total-final">
                 <span>Total a pagar</span>
                 <strong>R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
@@ -724,7 +732,7 @@ export default function CheckoutPage() {
             </div>
             <div className="fs-warning">
               <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-              Envio em 48–72h úteis após confirmação do pagamento. O Pix será gerado na próxima etapa.
+              Envio em até 72h úteis após confirmação do pagamento. O Pix será gerado na próxima etapa.
             </div>
             <button className="btn-primary" onClick={submitOrder} disabled={submitting}>
               {submitting ? "Gerando pedido..." : "💳 Gerar Pix e pagar →"}
