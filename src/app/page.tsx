@@ -575,29 +575,26 @@ export default function Home() {
                 ))
               )}
             </div>
-            <div style={{ padding: "12px 24px" }}>
-              <button
-                onClick={() => setCartOpen(false)}
-                style={{
-                  width: "100%",
-                  padding: "11px",
-                  background: "transparent",
-                  border: "1.5px solid rgba(194,130,102,0.3)",
-                  borderRadius: 8,
-                  color: "#C28266",
-                  fontFamily: "Raleway, sans-serif",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
-              >
-                ← Continuar comprando
-              </button>
-            </div>
-
             {cartItems.length > 0 && (
               <div className="cart-foot">
+                <button
+                  onClick={() => setCartOpen(false)}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    background: "transparent",
+                    border: "1.5px solid rgba(194,130,102,0.3)",
+                    borderRadius: 8,
+                    color: "#C28266",
+                    fontFamily: "Raleway, sans-serif",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    marginBottom: 12,
+                  }}
+                >
+                  ← Continuar comprando
+                </button>
                 <div className="cart-subtotal">
                   <span>Subtotal dos produtos</span>
                   <strong>R$ {cartTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
