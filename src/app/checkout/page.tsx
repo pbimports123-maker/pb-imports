@@ -7,7 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ChevronLeft, ShieldCheck, Truck, Package, AlertCircle } from "lucide-react";
 
-// ── Tipos ─────────────────────────────────────────────────────
 type CartItem = {
   cart_item_id: string;
   product: { id: string; name: string; price: number; brand: string };
@@ -64,7 +63,6 @@ function formatZip(v: string) {
   return v.replace(/\D/g, "").slice(0, 8).replace(/(\d{5})(\d)/, "$1-$2");
 }
 
-// ── Componente ────────────────────────────────────────────────
 export default function CheckoutPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -76,6 +74,7 @@ export default function CheckoutPage() {
   const [hasInsurance, setHasInsurance] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<"form" | "summary">("form");
+  const [cepLoading, setCepLoading] = useState(false);
 
   const [form, setForm] = useState<FormData>({
     name: "", cpf: "", phone: "",
@@ -85,7 +84,6 @@ export default function CheckoutPage() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // ── Carrega carrinho ───────────────────────────────────────
   const loadCart = useCallback(async () => {
     const sid = getSessionId();
     if (!sid) return;
@@ -94,12 +92,10 @@ export default function CheckoutPage() {
       const { data: cart } = await supabase
         .from("carts").select("id").eq("session_id", sid).single();
       if (!cart) { setCartItems([]); return; }
-
       const { data: items } = await supabase
         .from("cart_items")
         .select("id, quantity, product:products(id, name, price, brand)")
         .eq("cart_id", cart.id);
-
       setCartItems((items || []).map((i: any) => ({
         cart_item_id: i.id,
         product: i.product,
@@ -114,17 +110,12 @@ export default function CheckoutPage() {
 
   useEffect(() => { if (mounted) loadCart(); }, [mounted, loadCart]);
 
-  // ── Carrega fretes quando estado muda ─────────────────────
   useEffect(() => {
     if (!form.state) { setAllShippingRates([]); setShippingRates([]); setSelectedShipping(null); return; }
     async function loadShipping() {
       const { data, error } = await supabase
-        .from("shipping_rates")
-        .select("*")
-        .eq("is_active", true);
+        .from("shipping_rates").select("*").eq("is_active", true);
       if (error) { toast.error("Erro ao buscar fretes"); return; }
-
-      // Filtra por estado — região pode conter múltiplos estados separados por vírgula
       const filtered = (data || []).filter((r: ShippingRate) =>
         r.region.split(",").map((s: string) => s.trim()).includes(form.state)
       );
@@ -134,10 +125,8 @@ export default function CheckoutPage() {
     loadShipping();
   }, [form.state]);
 
-  // ── Filtra fretes conforme seguro ──────────────────────────
   useEffect(() => {
     if (hasInsurance) {
-      // Com seguro: só transportadoras
       const only = allShippingRates.filter((r) =>
         r.service_type.toLowerCase().includes("transportadora") ||
         r.service_type.toLowerCase().includes("transportadoras")
@@ -149,21 +138,45 @@ export default function CheckoutPage() {
     setSelectedShipping(null);
   }, [hasInsurance, allShippingRates]);
 
-  // ── Cálculos ───────────────────────────────────────────────
-  const subtotal = cartItems.reduce(
-    (sum, i) => sum + Number(i.product.price) * i.quantity, 0
-  );
+  const subtotal = cartItems.reduce((sum, i) => sum + Number(i.product.price) * i.quantity, 0);
   const shippingPrice = selectedShipping ? Number(selectedShipping.price) : 0;
   const insurancePrice = hasInsurance ? subtotal * 0.15 : 0;
   const total = subtotal + shippingPrice + insurancePrice;
 
-  // ── Handlers ───────────────────────────────────────────────
+  // Busca CEP via ViaCEP
+  const fetchCep = async (cep: string) => {
+    try {
+      setCepLoading(true);
+      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await res.json();
+      if (data.erro) { toast.error("CEP não encontrado"); return; }
+      setForm((prev) => ({
+        ...prev,
+        street: data.logradouro || prev.street,
+        district: data.bairro || prev.district,
+        city: data.localidade || prev.city,
+        state: data.uf || prev.state,
+      }));
+      toast.success("Endereço preenchido automaticamente!");
+    } catch {
+      toast.error("Erro ao buscar CEP");
+    } finally {
+      setCepLoading(false);
+    }
+  };
+
   const handleInput = (field: keyof FormData, raw: string) => {
     let value = raw;
     if (field === "cpf") value = formatCPF(raw);
     if (field === "phone") value = formatPhone(raw);
     if (field === "zip") value = formatZip(raw);
     setForm((prev) => ({ ...prev, [field]: value }));
+
+    // Busca CEP automaticamente quando completo
+    if (field === "zip") {
+      const digits = raw.replace(/\D/g, "");
+      if (digits.length === 8) fetchCep(digits);
+    }
   };
 
   const validateForm = () => {
@@ -185,16 +198,12 @@ export default function CheckoutPage() {
     district: "Bairro", zip: "CEP", city: "Cidade", state: "Estado",
   }[f]);
 
-  const goToSummary = () => {
-    if (validateForm()) setStep("summary");
-  };
+  const goToSummary = () => { if (validateForm()) setStep("summary"); };
 
-  // ── Submete pedido ─────────────────────────────────────────
   const submitOrder = async () => {
     if (!validateForm()) return;
     setSubmitting(true);
     try {
-      // 1. Cria o pedido
       const { data: order, error: orderErr } = await supabase
         .from("orders")
         .insert({
@@ -219,10 +228,8 @@ export default function CheckoutPage() {
         })
         .select("id")
         .single();
-
       if (orderErr) throw orderErr;
 
-      // 2. Cria os itens do pedido
       const orderItems = cartItems.map((i) => ({
         order_id: order.id,
         product_id: i.product.id,
@@ -231,20 +238,14 @@ export default function CheckoutPage() {
         quantity: i.quantity,
         subtotal: Number(i.product.price) * i.quantity,
       }));
-
       const { error: itemsErr } = await supabase.from("order_items").insert(orderItems);
       if (itemsErr) throw itemsErr;
 
-      // 3. Limpa o carrinho
       const sid = getSessionId();
-      const { data: cart } = await supabase
-        .from("carts").select("id").eq("session_id", sid).single();
+      const { data: cart } = await supabase.from("carts").select("id").eq("session_id", sid).single();
       if (cart) await supabase.from("cart_items").delete().eq("cart_id", cart.id);
 
-      // 4. Redireciona para o PagSeguro (próxima etapa)
-      // Por enquanto redireciona para página de confirmação
       router.push(`/pedido/${order.id}`);
-
     } catch (err: any) {
       toast.error("Erro ao finalizar pedido: " + err.message);
     } finally {
@@ -285,14 +286,12 @@ export default function CheckoutPage() {
         .co-root { min-height: 100vh; background: #FAF8EF; padding: 32px 16px 80px; }
         .co-wrap { max-width: 980px; margin: 0 auto; }
 
-        /* Topo */
         .co-top { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
         .back-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: #fff; border: 1px solid rgba(194,130,102,0.25); border-radius: 8px; color: #7A6558; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; transition: all 0.2s; }
         .back-btn:hover { border-color: #C28266; color: #C28266; }
         .co-title { font-family: "Raleway", sans-serif; font-size: 24px; font-weight: 700; color: #0D0F13; }
         .co-title span { color: #C28266; }
 
-        /* Steps */
         .steps { display: flex; align-items: center; gap: 8px; margin-bottom: 32px; }
         .step { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #B0A090; }
         .step.active { color: #C28266; }
@@ -302,31 +301,24 @@ export default function CheckoutPage() {
         .step.done .step-num { background: #7AAF90; color: #fff; }
         .step-sep { flex: 1; height: 1px; background: rgba(194,130,102,0.2); }
 
-        /* Grid */
         .co-grid { display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start; }
         @media (max-width: 780px) { .co-grid { grid-template-columns: 1fr; } }
 
-        /* Card */
         .card { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 14px; padding: 24px; margin-bottom: 16px; }
         .card-title { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #0D0F13; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
         .card-title svg { color: #C28266; }
 
-        /* Form */
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
         .form-row.triple { grid-template-columns: 1fr 1fr 1fr; }
-        .form-row.full { grid-template-columns: 1fr; }
         @media (max-width: 540px) { .form-row, .form-row.triple { grid-template-columns: 1fr; } }
         .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
         .field label { font-size: 12px; font-weight: 600; color: #7A6558; letter-spacing: 0.3px; text-transform: uppercase; }
-        .field input, .field select {
-          padding: 11px 14px; background: #FAF8EF; border: 1px solid rgba(194,130,102,0.25);
-          border-radius: 8px; color: #0D0F13; font-family: "DM Sans", sans-serif; font-size: 15px;
-          outline: none; transition: all 0.2s; width: 100%;
-        }
+        .field input, .field select { padding: 11px 14px; background: #FAF8EF; border: 1px solid rgba(194,130,102,0.25); border-radius: 8px; color: #0D0F13; font-family: "DM Sans", sans-serif; font-size: 15px; outline: none; transition: all 0.2s; width: 100%; }
         .field input:focus, .field select:focus { border-color: #C28266; box-shadow: 0 0 0 3px rgba(194,130,102,0.12); }
         .field input::placeholder { color: #C8B8AE; }
+        .field input:disabled { opacity: 0.6; cursor: not-allowed; }
+        .cep-hint { font-size: 11px; color: #C28266; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
 
-        /* Frete */
         .shipping-opts { display: flex; flex-direction: column; gap: 10px; }
         .shipping-opt { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1.5px solid rgba(194,130,102,0.2); border-radius: 10px; cursor: pointer; transition: all 0.2s; }
         .shipping-opt:hover { border-color: #C28266; background: rgba(194,130,102,0.04); }
@@ -338,16 +330,14 @@ export default function CheckoutPage() {
         .shipping-price { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #C28266; }
         .no-state { font-size: 13px; color: #B0A090; text-align: center; padding: 20px 0; }
 
-        /* Seguro */
         .insurance-card { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border: 1.5px solid rgba(194,130,102,0.2); border-radius: 10px; cursor: pointer; transition: all 0.2s; }
         .insurance-card:hover { border-color: #C28266; }
         .insurance-card.selected { border-color: #C28266; background: rgba(194,130,102,0.06); }
         .insurance-card input[type="checkbox"] { accent-color: #C28266; width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; }
-        .insurance-title { font-size: 14px; font-weight: 600; color: #0D0F13; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+        .insurance-title { font-size: 14px; font-weight: 600; color: #0D0F13; margin-bottom: 4px; }
         .insurance-desc { font-size: 12px; color: #7A6558; line-height: 1.5; }
         .insurance-price { font-family: "Raleway", sans-serif; font-size: 14px; font-weight: 700; color: #C28266; margin-top: 6px; }
 
-        /* Resumo lateral */
         .summary-card { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 14px; padding: 24px; position: sticky; top: 24px; }
         .summary-title { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #0D0F13; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 18px; }
         .summary-items { margin-bottom: 18px; }
@@ -360,20 +350,17 @@ export default function CheckoutPage() {
         .summary-line { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; }
         .summary-line span { color: #7A6558; }
         .summary-line strong { color: #0D0F13; font-weight: 600; }
-        .summary-line.insurance strong { color: #C0614F; }
         .summary-total { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 2px solid rgba(194,130,102,0.2); }
         .summary-total span { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #0D0F13; }
         .summary-total strong { font-family: "Raleway", sans-serif; font-size: 22px; font-weight: 700; color: #9E6650; }
         .pix-badge { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: rgba(122,175,144,0.1); border: 1px solid rgba(122,175,144,0.3); border-radius: 8px; margin-top: 14px; font-size: 12px; color: #5A8F70; font-weight: 500; }
 
-        /* Botões */
         .btn-primary { width: 100%; padding: 15px; background: #C28266; color: #fff; border: none; border-radius: 10px; font-family: "Raleway", sans-serif; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 20px; letter-spacing: 0.3px; }
         .btn-primary:hover { background: #9E6650; transform: translateY(-1px); }
         .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
         .btn-secondary { width: 100%; padding: 12px; background: transparent; color: #C28266; border: 1.5px solid rgba(194,130,102,0.4); border-radius: 10px; font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; margin-top: 10px; }
         .btn-secondary:hover { background: rgba(194,130,102,0.06); }
 
-        /* Tela de resumo final */
         .final-summary { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 14px; padding: 28px; max-width: 600px; margin: 0 auto; }
         .fs-header { text-align: center; margin-bottom: 24px; }
         .fs-title { font-family: "Raleway", sans-serif; font-size: 22px; font-weight: 700; color: #0D0F13; margin-bottom: 6px; }
@@ -394,15 +381,11 @@ export default function CheckoutPage() {
       `}</style>
 
       <div className="co-wrap">
-        {/* Topo */}
         <div className="co-top">
-          <Link href="/" className="back-btn">
-            <ChevronLeft size={16} /> Voltar
-          </Link>
+          <Link href="/" className="back-btn"><ChevronLeft size={16} /> Voltar</Link>
           <h1 className="co-title">Finalizar <span>Pedido</span></h1>
         </div>
 
-        {/* Steps */}
         <div className="steps">
           <div className={`step ${step === "form" ? "active" : "done"}`}>
             <div className="step-num">{step === "summary" ? "✓" : "1"}</div>
@@ -420,7 +403,6 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* ── STEP 1: Formulário ── */}
         {step === "form" && (
           <div className="co-grid">
             <div>
@@ -451,7 +433,14 @@ export default function CheckoutPage() {
                 <div className="form-row">
                   <div className="field">
                     <label>CEP *</label>
-                    <input placeholder="00000-000" value={form.zip} onChange={(e) => handleInput("zip", e.target.value)} />
+                    <input
+                      placeholder="00000-000"
+                      value={form.zip}
+                      onChange={(e) => handleInput("zip", e.target.value)}
+                      disabled={cepLoading}
+                      style={cepLoading ? { borderColor: "#C28266", opacity: 0.7 } : {}}
+                    />
+                    {cepLoading && <span className="cep-hint">🔍 Buscando endereço...</span>}
                   </div>
                   <div className="field">
                     <label>Estado *</label>
@@ -502,12 +491,7 @@ export default function CheckoutPage() {
                   <div className="shipping-opts">
                     {shippingRates.map((rate) => (
                       <label key={rate.id} className={`shipping-opt ${selectedShipping?.id === rate.id ? "selected" : ""}`}>
-                        <input
-                          type="radio"
-                          name="shipping"
-                          checked={selectedShipping?.id === rate.id}
-                          onChange={() => setSelectedShipping(rate)}
-                        />
+                        <input type="radio" name="shipping" checked={selectedShipping?.id === rate.id} onChange={() => setSelectedShipping(rate)} />
                         <div className="shipping-info">
                           <div className="shipping-name">{rate.service_type}</div>
                           <div className="shipping-desc">
@@ -527,35 +511,23 @@ export default function CheckoutPage() {
               <div className="card">
                 <div className="card-title"><ShieldCheck size={16} /> Seguro de Envio</div>
                 <label className={`insurance-card ${hasInsurance ? "selected" : ""}`}>
-                  <input
-                    type="checkbox"
-                    checked={hasInsurance}
-                    onChange={(e) => setHasInsurance(e.target.checked)}
-                  />
+                  <input type="checkbox" checked={hasInsurance} onChange={(e) => setHasInsurance(e.target.checked)} />
                   <div>
-                    <div className="insurance-title">
-                      🔒 Proteger meu pedido
-                    </div>
+                    <div className="insurance-title">🔒 Proteger meu pedido</div>
                     <div className="insurance-desc">
                       Garante o reenvio ou reembolso caso o pedido seja interceptado, extraviado ou perdido no transporte. Recomendado para pedidos acima de R$ 500.
                     </div>
                     {hasInsurance && (
                       <>
-                        <div className="insurance-price">
-                          + R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (15% do subtotal)
-                        </div>
-                        <div style={{ fontSize: 12, color: "#D4A96A", marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
-                          ⚠️ Com seguro, envio somente via Transportadora
-                        </div>
+                        <div className="insurance-price">+ R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (15% do subtotal)</div>
+                        <div style={{ fontSize: 12, color: "#D4A96A", marginTop: 6 }}>⚠️ Com seguro, envio somente via Transportadora</div>
                       </>
                     )}
                   </div>
                 </label>
               </div>
 
-              <button className="btn-primary" onClick={goToSummary}>
-                Ver resumo do pedido →
-              </button>
+              <button className="btn-primary" onClick={goToSummary}>Ver resumo do pedido →</button>
             </div>
 
             {/* Resumo lateral */}
@@ -569,54 +541,38 @@ export default function CheckoutPage() {
                         <div className="si-name">{item.product.name}</div>
                         <div className="si-qty">{item.quantity}x · {item.product.brand}</div>
                       </div>
-                      <div className="si-price">
-                        R$ {(Number(item.product.price) * item.quantity).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                      </div>
+                      <div className="si-price">R$ {(Number(item.product.price) * item.quantity).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
                     </div>
                   ))}
                 </div>
                 <div className="summary-divider" />
-                <div className="summary-line">
-                  <span>Subtotal produtos</span>
-                  <strong>R$ {subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
-                </div>
-                <div className="summary-line">
-                  <span>Frete ({selectedShipping?.service_type || "—"})</span>
-                  <strong>{selectedShipping ? `R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}</strong>
-                </div>
+                <div className="summary-line"><span>Subtotal produtos</span><strong>R$ {subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
+                <div className="summary-line"><span>Frete ({selectedShipping?.service_type || "—"})</span><strong>{selectedShipping ? `R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}</strong></div>
                 {hasInsurance && (
-                  <div className="summary-line insurance">
-                    <span>🔒 Seguro (25%)</span>
-                    <strong>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
-                  </div>
+                  <div className="summary-line"><span>🔒 Seguro (15%)</span><strong>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
                 )}
                 <div className="summary-total">
                   <span>Total</span>
                   <strong>R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
                 </div>
-                <div className="pix-badge">
-                  💳 Pagamento via Pix — aprovação imediata
-                </div>
+                <div className="pix-badge">💳 Pagamento via Pix — aprovação imediata</div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── STEP 2: Resumo final antes de pagar ── */}
         {step === "summary" && (
           <div className="final-summary">
             <div className="fs-header">
               <div className="fs-title">Confirme seu pedido</div>
               <div className="fs-sub">Revise tudo antes de gerar o Pix</div>
             </div>
-
             <div className="fs-section">
               <div className="fs-section-title">👤 Dados do cliente</div>
               <div className="fs-row"><span>Nome</span><strong>{form.name}</strong></div>
               <div className="fs-row"><span>CPF</span><strong>{form.cpf}</strong></div>
               <div className="fs-row"><span>WhatsApp</span><strong>{form.phone}</strong></div>
             </div>
-
             <div className="fs-section">
               <div className="fs-section-title">📍 Endereço de entrega</div>
               <div className="fs-row"><span>Endereço</span><strong>{form.street}, {form.number}{form.complement ? ` - ${form.complement}` : ""}</strong></div>
@@ -624,7 +580,6 @@ export default function CheckoutPage() {
               <div className="fs-row"><span>Cidade/Estado</span><strong>{form.city} — {form.state}</strong></div>
               <div className="fs-row"><span>CEP</span><strong>{form.zip}</strong></div>
             </div>
-
             <div className="fs-section">
               <div className="fs-section-title">📦 Itens do pedido</div>
               {cartItems.map((item) => (
@@ -634,39 +589,25 @@ export default function CheckoutPage() {
                 </div>
               ))}
             </div>
-
             <div className="fs-total-box">
-              <div className="fs-total-row">
-                <span>Subtotal produtos</span>
-                <strong>R$ {subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
-              </div>
-              <div className="fs-total-row">
-                <span>Frete {selectedShipping?.service_type}</span>
-                <strong>R$ {shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
-              </div>
+              <div className="fs-total-row"><span>Subtotal produtos</span><strong>R$ {subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
+              <div className="fs-total-row"><span>Frete {selectedShipping?.service_type}</span><strong>R$ {shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
               {hasInsurance && (
-                <div className="fs-total-row">
-                  <span>🔒 Seguro de envio (15%)</span>
-                  <strong style={{ color: "#C0614F" }}>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
-                </div>
+                <div className="fs-total-row"><span>🔒 Seguro de envio (15%)</span><strong style={{ color: "#C0614F" }}>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
               )}
               <div className="fs-total-final">
                 <span>Total a pagar</span>
                 <strong>R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
               </div>
             </div>
-
             <div className="fs-warning">
               <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
               Envio em 48–72h úteis após confirmação do pagamento. O Pix será gerado na próxima etapa.
             </div>
-
             <button className="btn-primary" onClick={submitOrder} disabled={submitting}>
               {submitting ? "Gerando pedido..." : "💳 Gerar Pix e pagar →"}
             </button>
-            <button className="btn-secondary" onClick={() => setStep("form")}>
-              ← Editar dados
-            </button>
+            <button className="btn-secondary" onClick={() => setStep("form")}>← Editar dados</button>
           </div>
         )}
       </div>

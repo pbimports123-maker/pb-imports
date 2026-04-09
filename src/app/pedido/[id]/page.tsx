@@ -42,9 +42,8 @@ export default function PedidoPage() {
   const [loading, setLoading] = useState(true);
   const [generatingPix, setGeneratingPix] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(1800); // 30 minutos
+  const [timeLeft, setTimeLeft] = useState(1800);
 
-  // ── Carrega pedido ────────────────────────────────────────
   useEffect(() => {
     if (!id) return;
     async function load() {
@@ -58,7 +57,6 @@ export default function PedidoPage() {
           .from("order_items").select("*").eq("order_id", id);
         setItems(itemsData || []);
 
-        // Se ainda não tem QR code, gera agora
         if (!orderData.pagseguro_qrcode && orderData.payment_status === "pending") {
           await generatePix(orderData);
         }
@@ -72,7 +70,7 @@ export default function PedidoPage() {
     load();
   }, [id]);
 
-  // ── Realtime — atualiza status do pagamento ───────────────
+  // Realtime — detecta pagamento e recarrega a página
   useEffect(() => {
     if (!id) return;
     const channel = supabase
@@ -86,6 +84,9 @@ export default function PedidoPage() {
         setOrder((prev) => prev ? { ...prev, ...payload.new } : prev);
         if (payload.new.payment_status === "paid") {
           toast.success("🎉 Pagamento confirmado!");
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
         }
       })
       .subscribe();
@@ -93,7 +94,7 @@ export default function PedidoPage() {
     return () => { supabase.removeChannel(channel); };
   }, [id]);
 
-  // ── Timer de expiração do Pix ─────────────────────────────
+  // Timer de expiração
   useEffect(() => {
     if (!order?.pagseguro_qrcode || order.payment_status === "paid") return;
     const timer = setInterval(() => {
@@ -105,7 +106,6 @@ export default function PedidoPage() {
     return () => clearInterval(timer);
   }, [order?.pagseguro_qrcode, order?.payment_status]);
 
-  // ── Gera Pix via API ──────────────────────────────────────
   const generatePix = async (orderData: Order) => {
     setGeneratingPix(true);
     try {
@@ -129,7 +129,6 @@ export default function PedidoPage() {
     }
   };
 
-  // ── Copiar código Pix ─────────────────────────────────────
   const copyPix = () => {
     if (!order?.pagseguro_qrcode_text) return;
     navigator.clipboard.writeText(order.pagseguro_qrcode_text);
@@ -163,6 +162,9 @@ export default function PedidoPage() {
         @import url('https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&family=DM+Sans:wght@400;500&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #FAF8EF; font-family: "DM Sans", sans-serif; color: #0D0F13; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(90,143,112,0.4); } 50% { box-shadow: 0 0 0 12px rgba(90,143,112,0); } }
       `}</style>
       <style jsx>{`
         .root { min-height: 100vh; background: #FAF8EF; padding: 32px 16px 80px; }
@@ -173,18 +175,21 @@ export default function PedidoPage() {
         .page-title { font-family: "Raleway", sans-serif; font-size: 26px; font-weight: 700; color: #0D0F13; }
         .page-title span { color: #C28266; }
 
-        .card { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 14px; padding: 24px; margin-bottom: 16px; }
+        .card { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 14px; padding: 24px; margin-bottom: 16px; animation: fadeIn 0.4s ease both; }
 
         /* Pago */
-        .paid-box { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px; text-align: center; }
-        .paid-icon { width: 72px; height: 72px; background: rgba(122,175,144,0.1); border: 2px solid #7AAF90; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-        .paid-title { font-family: "Raleway", sans-serif; font-size: 22px; font-weight: 700; color: #5A8F70; }
-        .paid-sub { font-size: 14px; color: #7A6558; line-height: 1.5; }
+        .paid-box { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 32px 16px; text-align: center; }
+        .paid-icon { width: 80px; height: 80px; background: rgba(122,175,144,0.1); border: 2px solid #7AAF90; border-radius: 50%; display: flex; align-items: center; justify-content: center; animation: pulse 2s ease-in-out infinite; }
+        .paid-title { font-family: "Raleway", sans-serif; font-size: 24px; font-weight: 700; color: #5A8F70; }
+        .paid-sub { font-size: 14px; color: #7A6558; line-height: 1.6; max-width: 400px; }
+        .paid-steps { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 380px; margin-top: 8px; }
+        .paid-step { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: rgba(122,175,144,0.06); border: 1px solid rgba(122,175,144,0.2); border-radius: 10px; font-size: 13px; color: #3A2E28; text-align: left; }
+        .paid-step-num { width: 24px; height: 24px; border-radius: 50%; background: #7AAF90; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
         /* Pix */
         .pix-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-        .pix-title { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #0D0F13; text-transform: uppercase; letter-spacing: 0.5px; }
-        .pix-timer { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: ${timeLeft < 300 ? "#C0614F" : "#D4A96A"}; }
+        .pix-title { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #0D0F13; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
+        .pix-timer { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
         .qrcode-wrap { display: flex; justify-content: center; margin-bottom: 20px; }
         .qrcode-wrap img { width: 220px; height: 220px; border-radius: 12px; border: 2px solid rgba(194,130,102,0.2); }
         .qrcode-placeholder { width: 220px; height: 220px; border-radius: 12px; border: 2px dashed rgba(194,130,102,0.3); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: #B0A090; font-size: 13px; }
@@ -192,8 +197,13 @@ export default function PedidoPage() {
         .pix-separator::before, .pix-separator::after { content: ""; flex: 1; height: 1px; background: rgba(194,130,102,0.15); }
         .pix-code-box { background: #FAF8EF; border: 1px solid rgba(194,130,102,0.25); border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
         .pix-code-text { flex: 1; font-size: 11px; color: #7A6558; word-break: break-all; line-height: 1.4; font-family: monospace; }
-        .copy-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: ${copied ? "#7AAF90" : "#C28266"}; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0; font-family: "Raleway", sans-serif; }
+        .copy-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0; font-family: "Raleway", sans-serif; }
         .pix-info { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: #7A6558; line-height: 1.5; padding: 10px 14px; background: rgba(194,130,102,0.06); border-radius: 8px; }
+
+        /* Aguardando */
+        .waiting-badge { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; background: rgba(212,169,106,0.1); border: 1px solid rgba(212,169,106,0.25); border-radius: 8px; margin-top: 12px; font-size: 12px; color: #8A6830; font-weight: 500; }
+        .waiting-dot { width: 8px; height: 8px; border-radius: 50%; background: #D4A96A; animation: blink 1.5s ease-in-out infinite; }
+        @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
         /* Resumo */
         .section-title { font-size: 11px; font-weight: 700; color: #A8978E; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
@@ -202,7 +212,7 @@ export default function PedidoPage() {
         .item-name { color: #0D0F13; font-weight: 500; }
         .item-qty { font-size: 12px; color: #A8978E; }
         .item-price { color: #C28266; font-weight: 600; white-space: nowrap; }
-        .total-box { background: rgba(194,130,102,0.06); border: 1.5px solid rgba(194,130,102,0.2); border-radius: 10px; padding: 16px 20px; margin-top: 4px; }
+        .total-box { background: rgba(194,130,102,0.06); border: 1.5px solid rgba(194,130,102,0.2); border-radius: 10px; padding: 16px 20px; margin-top: 16px; }
         .total-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
         .total-row span { color: #7A6558; }
         .total-row strong { color: #0D0F13; font-weight: 600; }
@@ -221,37 +231,57 @@ export default function PedidoPage() {
 
         .back-link { display: block; text-align: center; margin-top: 20px; font-size: 13px; color: #A8978E; text-decoration: none; }
         .back-link:hover { color: #C28266; }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
       <div className="wrap">
         <div className="page-top">
           <div className="order-num">Pedido #{order.id.slice(0, 8).toUpperCase()}</div>
-          <h1 className="page-title">{isPaid ? "Pedido " : "Finalizar "}<span>{isPaid ? "Confirmado" : "Pagamento"}</span></h1>
+          <h1 className="page-title">
+            {isPaid ? "Pedido " : "Finalizar "}
+            <span>{isPaid ? "Confirmado! 🎉" : "Pagamento"}</span>
+          </h1>
         </div>
 
-        {/* ── PAGO ── */}
+        {/* PAGO */}
         {isPaid && (
           <div className="card">
             <div className="paid-box">
-              <div className="paid-icon"><CheckCircle size={36} color="#5A8F70" /></div>
-              <div className="paid-title">Pagamento confirmado! 🎉</div>
+              <div className="paid-icon">
+                <CheckCircle size={40} color="#5A8F70" />
+              </div>
+              <div className="paid-title">Pagamento confirmado!</div>
               <div className="paid-sub">
-                Olá, <strong>{order.customer_name.split(" ")[0]}</strong>! Seu pedido foi aprovado e será preparado em até 48h úteis.<br />
-                Você receberá uma confirmação no WhatsApp <strong>{order.customer_phone}</strong>.
+                Olá, <strong>{order.customer_name.split(" ")[0]}</strong>! 🎉<br />
+                Seu pedido foi aprovado e será preparado com carinho.<br />
+                Você receberá confirmação no WhatsApp <strong>{order.customer_phone}</strong>.
+              </div>
+              <div className="paid-steps">
+                <div className="paid-step">
+                  <div className="paid-step-num">1</div>
+                  Pagamento confirmado ✓
+                </div>
+                <div className="paid-step">
+                  <div className="paid-step-num">2</div>
+                  Separação e embalagem em até 48h úteis
+                </div>
+                <div className="paid-step">
+                  <div className="paid-step-num">3</div>
+                  Envio com código de rastreio via WhatsApp
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── PIX ── */}
+        {/* PIX */}
         {!isPaid && (
           <div className="card">
             <div className="pix-header">
-              <div className="pix-title">💳 Pague com Pix</div>
+              <div className="pix-title">
+                💳 Pague com Pix
+              </div>
               {order.pagseguro_qrcode && timeLeft > 0 && (
-                <div className="pix-timer">
+                <div className="pix-timer" style={{ color: timeLeft < 300 ? "#C0614F" : "#D4A96A" }}>
                   <Clock size={14} />
                   Expira em {formatTime(timeLeft)}
                 </div>
@@ -268,21 +298,26 @@ export default function PedidoPage() {
             ) : order.pagseguro_qrcode && timeLeft > 0 ? (
               <>
                 <div className="qrcode-wrap">
-                  <img
-                    src={`data:image/png;base64,${order.pagseguro_qrcode}`}
-                    alt="QR Code Pix"
-                  />
+                  <img src={`data:image/png;base64,${order.pagseguro_qrcode}`} alt="QR Code Pix" />
                 </div>
                 <div className="pix-separator">ou copie o código abaixo</div>
                 <div className="pix-code-box">
                   <span className="pix-code-text">{order.pagseguro_qrcode_text}</span>
-                  <button className="copy-btn" onClick={copyPix}>
+                  <button
+                    className="copy-btn"
+                    onClick={copyPix}
+                    style={{ background: copied ? "#7AAF90" : "#C28266" }}
+                  >
                     <Copy size={13} />
                     {copied ? "Copiado!" : "Copiar"}
                   </button>
                 </div>
                 <div className="pix-info">
                   📌 Abra o app do seu banco → Pix → Ler QR Code ou Pix Copia e Cola. O pagamento é confirmado em segundos.
+                </div>
+                <div className="waiting-badge">
+                  <div className="waiting-dot" />
+                  Aguardando confirmação do pagamento...
                 </div>
               </>
             ) : (
@@ -310,7 +345,7 @@ export default function PedidoPage() {
               <div className="item-price">R$ {Number(item.subtotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
             </div>
           ))}
-          <div className="total-box" style={{ marginTop: 16 }}>
+          <div className="total-box">
             <div className="total-row"><span>Subtotal produtos</span><strong>R$ {Number(order.subtotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
             <div className="total-row"><span>Frete ({order.shipping_type})</span><strong>R$ {Number(order.shipping_price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
             {order.has_insurance && (
