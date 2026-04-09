@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import * as https from "https";
-import * as http from "http";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,51 +11,53 @@ const supabaseAdmin = createClient(
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY!;
 const ASAAS_BASE_URL = "https://api.asaas.com/v3";
 
-// Agente que força HTTP/1.1 para compatibilidade com Asaas
-const http1Agent = new https.Agent({ ALPNProtocols: ["http/1.1"] });
-
 // Fetch customizado que usa HTTP/1.1
 async function asaasFetch(url: string, options: any = {}): Promise<any> {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
-    const isHttps = urlObj.protocol === "https:";
-    const agent = isHttps ? http1Agent : new http.Agent();
+    const agent = new https.Agent({ ALPNProtocols: ["http/1.1"] });
 
-    const reqOptions = {
+    const reqOptions: https.RequestOptions = {
       hostname: urlObj.hostname,
-      port: urlObj.port || (isHttps ? 443 : 80),
+      port: urlObj.port || 443,
       path: urlObj.pathname + urlObj.search,
       method: options.method || "GET",
       headers: {
-        ...options.headers,
+        "accept": "application/json",
         "Content-Type": "application/json",
+        ...(options.headers || {}),
       },
       agent,
     };
 
     const body = options.body ? String(options.body) : null;
-    if (body && reqOptions.headers) {
+    if (body) {
       (reqOptions.headers as any)["Content-Length"] = Buffer.byteLength(body);
     }
 
-    const lib = isHttps ? https : http;
-    const req = lib.request(reqOptions, (res) => {
-      let data = "";
-      res.on("data", (chunk) => { data += chunk; });
+    const req = https.request(reqOptions, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => chunks.push(chunk));
       res.on("end", () => {
+        const raw = Buffer.concat(chunks).toString("utf8");
+        console.log(`[asaasFetch] ${reqOptions.method} ${urlObj.pathname} → ${res.statusCode} → ${raw.slice(0, 200)}`);
         resolve({
           ok: res.statusCode! >= 200 && res.statusCode! < 300,
           status: res.statusCode,
           json: async () => {
-            try { return JSON.parse(data); }
+            try { return JSON.parse(raw); }
             catch { return {}; }
           },
-          text: async () => data,
+          text: async () => raw,
         });
       });
     });
 
-    req.on("error", reject);
+    req.on("error", (err) => {
+      console.error("[asaasFetch] error:", err);
+      reject(err);
+    });
+
     if (body) req.write(body);
     req.end();
   });
