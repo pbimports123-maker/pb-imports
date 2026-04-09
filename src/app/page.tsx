@@ -29,7 +29,7 @@ function saveLastVisit(): void {
 }
 
 const PRINCIPIOS_ATIVOS = ["Tirzepatida", "Retatrutida", "Semaglutida"];
-const TIRZEPATIDA_MARCAS = ["lipoland", "mounjaro"];
+const TIRZEPATIDA_MARCAS = ["lipoland", "lipoless", "mounjaro", "t.g", "tirzec"];
 
 function getEmagrecedorGroup(productName: string): string {
   const lower = (productName || "").toLowerCase();
