@@ -207,15 +207,23 @@ export default function Home() {
         );
       });
       const isEmagrecedores = (cat.name || "").toLowerCase() === "emagrecedores";
-      const PRINCIPIOS = ["Tirzepatida", "Retatrutida", "Semaglutida"];
+      const PRINCIPIOS = ["Tirzepatida", "Retatrutida", "Retatrutide", "Semaglutida"];
       const brandsMap = new Map<string, Product[]>();
       filtered.forEach((p) => {
         let key: string;
         if (isEmagrecedores) {
-          const found = PRINCIPIOS.find((pa) =>
-            (p.name || "").toLowerCase().includes(pa.toLowerCase())
+          const TIRZEPATIDA_MARCAS = ["lipoland", "mounjaro"];
+          const isTirzepatidaMarca = TIRZEPATIDA_MARCAS.some((m) =>
+            (p.name || "").toLowerCase().includes(m)
           );
-          key = found || "Outros";
+          if (isTirzepatidaMarca) {
+            key = "Tirzepatida";
+          } else {
+            const found = PRINCIPIOS.find((pa) =>
+              (p.name || "").toLowerCase().includes(pa.toLowerCase())
+            );
+            key = found || "Outros";
+          }
         } else {
           key = p.brand || "Outros";
         }
