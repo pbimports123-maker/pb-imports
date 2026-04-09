@@ -1,14 +1,16 @@
 // src/app/api/pagseguro/webhook/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import {
+  getSupabaseAdmin,
+  getSupabaseAdminEnvDiagnostics,
+} from "@/lib/supabase-admin";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
     const body = await req.json();
     console.log("Asaas webhook:", JSON.stringify(body, null, 2));
 
@@ -22,16 +24,53 @@ export async function POST(req: NextRequest) {
     const orderId = payment.externalReference;
 
     if (event === "PAYMENT_RECEIVED" || event === "PAYMENT_CONFIRMED") {
-      await supabaseAdmin
+      const paidPayload = { payment_status: "paid", status: "paid" };
+      console.log("Webhook updating order to paid:", {
+        orderId,
+        event,
+        payload: paidPayload,
+      });
+
+      const { data: updatedRows, error: updateError } = await supabaseAdmin
         .from("orders")
-        .update({ payment_status: "paid", status: "paid" })
+        .update(paidPayload)
+        .select("id, payment_status, status")
         .eq("id", orderId);
 
-      const { data: order } = await supabaseAdmin
+      if (updateError) {
+        console.error("Webhook order update failed:", {
+          orderId,
+          event,
+          error: updateError,
+          env: getSupabaseAdminEnvDiagnostics(),
+        });
+
+        return NextResponse.json(
+          { error: "Failed to update order as paid" },
+          { status: 500 }
+        );
+      }
+
+      console.log("Webhook order update result:", {
+        orderId,
+        event,
+        updatedRows,
+        updatedCount: updatedRows?.length ?? 0,
+      });
+
+      const { data: order, error: orderError } = await supabaseAdmin
         .from("orders")
         .select("*, order_items(*)")
         .eq("id", orderId)
         .single();
+
+      if (orderError) {
+        console.error("Webhook order fetch after payment failed:", {
+          orderId,
+          event,
+          error: orderError,
+        });
+      }
 
       if (order) {
         // Baixa de estoque para cada item do pedido
@@ -59,15 +98,44 @@ export async function POST(req: NextRequest) {
     }
 
     if (event === "PAYMENT_OVERDUE" || event === "PAYMENT_DELETED") {
-      await supabaseAdmin
+      const expiredPayload = { payment_status: "expired", status: "cancelled" };
+      console.log("Webhook updating order to expired:", {
+        orderId,
+        event,
+        payload: expiredPayload,
+      });
+
+      const { data: updatedRows, error: updateError } = await supabaseAdmin
         .from("orders")
-        .update({ payment_status: "expired", status: "cancelled" })
+        .update(expiredPayload)
+        .select("id, payment_status, status")
         .eq("id", orderId);
+
+      if (updateError) {
+        console.error("Webhook order expiration update failed:", {
+          orderId,
+          event,
+          error: updateError,
+          env: getSupabaseAdminEnvDiagnostics(),
+        });
+
+        return NextResponse.json(
+          { error: "Failed to update order as expired" },
+          { status: 500 }
+        );
+      }
+
+      console.log("Webhook order expiration update result:", {
+        orderId,
+        event,
+        updatedRows,
+        updatedCount: updatedRows?.length ?? 0,
+      });
     }
 
     return NextResponse.json({ received: true });
   } catch (err: any) {
-    console.error("Webhook error:", err);
+    console.error("Webhook error:", err, getSupabaseAdminEnvDiagnostics());
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
