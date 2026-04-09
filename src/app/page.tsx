@@ -439,11 +439,11 @@ export default function Home() {
       )}
 
       <div className="quick-links">
-        <Link href="/fretes" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit" }}>
+        <Link href="/fretes" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit", minWidth: 0 }}>
           <div className="quick-banner-icon">🚚</div>
           <div className="quick-banner-text"><strong>Tabela de Fretes</strong><span>Valores de entrega</span></div>
         </Link>
-        <Link href="/regras" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit" }}>
+        <Link href="/regras" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit", minWidth: 0 }}>
           <div className="quick-banner-icon">📋</div>
           <div className="quick-banner-text"><strong>Regras de Envio</strong><span>Como funciona</span></div>
         </Link>
