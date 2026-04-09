@@ -517,7 +517,16 @@ export default function Home() {
                           const dosagem = descParts[descParts.length - 1] || "—";
                           return (
                             <div className={`product-list-row ${outOfStock ? "out" : ""}`} key={p.id}>
-                              <div className="pl-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                {(p as any).image_url ? (
+                                  <img src={(p as any).image_url} alt={p.name} style={{ width: 36, height: 36, borderRadius: 6, objectFit: "cover", flexShrink: 0, border: "1px solid rgba(194,130,102,0.2)" }} />
+                                ) : (
+                                  <div style={{ width: 36, height: 36, borderRadius: 6, background: "linear-gradient(135deg, #C28266, #9E6650)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 11, fontWeight: 700, color: "#fff", fontFamily: "Raleway, sans-serif" }}>
+                                    {(p.name || "").slice(0, 2).toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="pl-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
+                              </div>
                               <div className="pl-apresentacao hide-mobile">{apresentacao}</div>
                               <div className="pl-dosagem hide-mobile">{dosagem}</div>
                               <div className="pl-preco">
