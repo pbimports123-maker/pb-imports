@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ShoppingCart, Minus, X } from "lucide-react";
+import { ShoppingCart, Plus, Minus, X } from "lucide-react";
 import { Product, Category } from "@/types/product";
 
 type BrandGroup = { name: string; products: Product[] };
@@ -195,11 +195,13 @@ export default function Home() {
           (cat.name || "").toLowerCase().includes(s)
         );
       });
+
       const groupMap = new Map<string, Product[]>();
       filtered.forEach((p) => {
         const key = isEmagrecedores ? getEmagrecedorGroup(p.name || "") : (p.brand || "Outros");
         groupMap.set(key, [...(groupMap.get(key) || []), p]);
       });
+
       const brands: BrandGroup[] = Array.from(groupMap.entries()).map(([name, products]) => ({ name, products }));
       return { id: cat.id, name: cat.name || "Sem Categoria", abbr: (cat.name || "??").slice(0, 2).toUpperCase(), brands };
     });
@@ -217,7 +219,7 @@ export default function Home() {
         :root {
           --bg-void: #FAF8EF; --bg-panel: #F2EDE0; --bg-card: #FFFFFF; --bg-card2: #EDE8DA;
           --accent-terra: #C28266; --accent-terra-light: #D9A890; --accent-terra-dark: #9E6650;
-          --accent-sage: #7AAF90; --accent-red: #C0614F;
+          --accent-sage: #7AAF90; --accent-amber: #D4A96A; --accent-red: #C0614F;
           --text-primary: #0D0F13; --text-muted: #7A6558; --text-dim: #B0A090;
           --border-main: rgba(194,130,102,0.22); --border-dim: rgba(194,130,102,0.12);
           --grid-line: rgba(194,130,102,0.06);
@@ -231,7 +233,6 @@ export default function Home() {
       <style jsx>{`
         .wrapper { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; position: relative; z-index: 1; }
         @media (max-width: 960px) { .wrapper { padding: 20px 16px 64px; } .page-title { font-size: 26px; } }
-
         .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; }
         .top-logo { display: flex; align-items: center; gap: 14px; }
         .logo-hex { width: 46px; height: 46px; background: linear-gradient(135deg, var(--accent-terra), var(--accent-terra-dark)); clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); display: flex; align-items: center; justify-content: center; animation: pulse-logo 3s ease-in-out infinite; flex-shrink: 0; }
@@ -239,38 +240,29 @@ export default function Home() {
         .logo-hex span { font-family: "Raleway", sans-serif; font-size: 13px; font-weight: 700; color: #fff; }
         .logo-text .logo-name { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: var(--accent-terra-dark); letter-spacing: 2px; text-transform: uppercase; }
         .logo-text .logo-sub { font-size: 10px; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; display: block; }
-
         .cart-btn { position: relative; display: flex; align-items: center; gap: 8px; padding: 10px 18px; background: var(--accent-terra); color: #fff; border: none; border-radius: 10px; cursor: pointer; font-family: "Raleway", sans-serif; font-size: 14px; font-weight: 600; transition: all 0.2s; }
         .cart-btn:hover { background: var(--accent-terra-dark); transform: translateY(-1px); }
         .cart-badge { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; background: #C0614F; color: #fff; border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-
         .page-title { font-family: "Raleway", sans-serif; font-size: 32px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 24px; color: var(--text-primary); }
         .page-title span { color: var(--accent-terra); }
         .badges { display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
         .badge { padding: 8px 20px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; border: 1px solid; border-radius: 8px; }
         .badge.green { border-color: var(--accent-sage); color: var(--accent-sage); background: rgba(122,175,144,0.1); }
         .badge.red { border-color: var(--accent-red); color: var(--accent-red); background: rgba(192,97,79,0.08); }
-
         .search-wrap { position: relative; margin-bottom: 20px; }
         .search-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 16px; z-index: 1; }
         .search-input { width: 100%; padding: 14px 16px 14px 46px; background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 10px; color: var(--text-primary); font-family: "DM Sans", sans-serif; font-size: 16px; outline: none; transition: all 0.2s; }
         .search-input::placeholder { color: var(--text-dim); }
         .search-input:focus { border-color: var(--accent-terra); box-shadow: 0 0 0 3px rgba(194,130,102,0.12); }
-
         .notif-banner { display: flex; align-items: center; gap: 14px; padding: 16px 20px; background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 10px; margin-bottom: 16px; transition: all 0.2s; animation: slideIn 0.5s ease both; }
         .notif-icon { width: 36px; height: 36px; background: rgba(194,130,102,0.1); border: 1px solid var(--border-main); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
         .notif-text strong { display: block; font-size: 15px; font-weight: 600; color: var(--text-primary); }
         .notif-text span { font-size: 12px; color: var(--text-muted); }
         .notif-close { margin-left: auto; color: var(--text-dim); font-size: 18px; cursor: pointer; padding: 4px; }
-
-        /* Quick links — corrigido para não quebrar texto */
         .quick-links { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-        .quick-link-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 10px; text-decoration: none; color: inherit; min-width: 0; }
         .quick-banner-icon { width: 36px; height: 36px; background: rgba(194,130,102,0.1); border: 1px solid var(--border-main); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-        .quick-banner-text { min-width: 0; }
-        .quick-banner-text strong { display: block; font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .quick-banner-text span { display: block; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
+        .quick-banner-text strong { display: block; font-size: 15px; font-weight: 600; color: var(--text-primary); }
+        .quick-banner-text span { font-size: 12px; color: var(--text-muted); }
         .info-strip { display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px; background: var(--bg-card2); border: 1px solid var(--border-dim); border-left: 3px solid var(--accent-terra); border-radius: 0 8px 8px 0; margin-bottom: 28px; font-size: 14px; line-height: 1.6; animation: slideIn 0.5s ease 0.2s both; }
         .info-strip .i-icon { font-size: 16px; margin-top: 2px; flex-shrink: 0; }
         .info-strip .cyan { color: var(--accent-terra); font-weight: 600; }
@@ -305,28 +297,27 @@ export default function Home() {
         .brand-arrow { font-size: 10px; color: var(--text-muted); transition: transform 0.3s; margin-left: 8px; }
         .brand-block.open .brand-arrow { transform: rotate(180deg); }
         .brand-block.open .brand-body { display: block; }
-        .brand-body { display: none; border-top: 1px solid var(--border-dim); padding: 10px 12px 12px; }
+        .brand-body { display: none; border-top: 1px solid var(--border-dim); padding: 8px 0; }
 
-        /* Produto card horizontal */
-        .product-card-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 12px; margin-bottom: 8px; transition: all 0.2s; }
-        .product-card-row:last-child { margin-bottom: 0; }
-        .product-card-row:hover { border-color: var(--accent-terra-light); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(194,130,102,0.12); }
-        .product-card-row.out { opacity: 0.6; }
-
-        .pc-img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex-shrink: 0; border: 1px solid rgba(194,130,102,0.2); }
-        .pc-placeholder { width: 48px; height: 48px; border-radius: 8px; background: linear-gradient(135deg, #C28266, #9E6650); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px; font-weight: 700; color: #fff; font-family: "Raleway", sans-serif; }
-
+        /* Produto em card horizontal */
+        .product-card-row { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 12px; margin-bottom: 8px; transition: all 0.2s; }
+        .product-card-row:hover { border-color: var(--accent-terra-light); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(194,130,102,0.12); }
+        .product-card-row.out { opacity: 0.65; }
+        .pc-img { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex-shrink: 0; border: 1px solid rgba(194,130,102,0.2); }
+        .pc-placeholder { width: 44px; height: 44px; border-radius: 8px; background: linear-gradient(135deg, #C28266, #9E6650); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; font-weight: 700; color: #fff; font-family: "Raleway", sans-serif; }
         .pc-info { flex: 1; min-width: 0; }
-        .pc-name { font-size: 14px; font-weight: 700; color: var(--text-primary); line-height: 1.3; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .pc-brand { font-size: 11px; color: var(--text-muted); letter-spacing: 0.3px; margin-bottom: 4px; }
-        .pc-apresentacao { font-size: 11px; color: var(--text-dim); }
-        .pc-dosagem { font-size: 11px; color: var(--text-dim); }
-
-        .pc-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
-        .pc-price { font-family: "Raleway", sans-serif; font-size: 16px; font-weight: 700; color: var(--accent-terra-dark); }
-        .pc-status-out { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; border: 1px solid rgba(192,97,79,0.4); border-radius: 20px; color: var(--accent-red); background: rgba(192,97,79,0.08); white-space: nowrap; }
-        .pc-status-out::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--accent-red); }
-        .pc-add-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: var(--accent-terra); color: #fff; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+        .pc-name { font-size: 14px; font-weight: 700; color: var(--text-primary); line-height: 1.3; margin-bottom: 2px; }
+        .pc-brand { font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px; }
+        .pc-meta { display: flex; align-items: center; gap: 16px; }
+        .pc-apresentacao { font-size: 12px; color: var(--text-muted); }
+        .pc-dosagem { font-size: 12px; color: var(--text-muted); }
+        .pc-price { font-family: "Raleway", sans-serif; font-size: 16px; font-weight: 700; color: var(--accent-terra-dark); white-space: nowrap; }
+        .pc-status { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; border: 1px solid; border-radius: 20px; white-space: nowrap; }
+        .pc-status.available { border-color: rgba(122,175,144,0.5); color: var(--accent-sage); background: rgba(122,175,144,0.1); }
+        .pc-status.available::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--accent-sage); }
+        .pc-status.unavailable { border-color: rgba(192,97,79,0.4); color: var(--accent-red); background: rgba(192,97,79,0.08); }
+        .pc-status.unavailable::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--accent-red); }
+        .pc-add-btn { display: flex; align-items: center; gap: 6px; padding: 9px 14px; background: var(--accent-terra); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0; font-family: "Raleway", sans-serif; }
         .pc-add-btn:hover { background: var(--accent-terra-dark); transform: translateY(-1px); }
         .pc-add-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
@@ -357,7 +348,6 @@ export default function Home() {
         .cart-subtotal strong { font-family: "Raleway", sans-serif; font-size: 20px; font-weight: 700; color: var(--accent-terra-dark); }
         .checkout-btn { width: 100%; padding: 14px; background: var(--accent-terra); color: #fff; border: none; border-radius: 10px; font-family: "Raleway", sans-serif; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px; }
         .checkout-btn:hover { background: var(--accent-terra-dark); transform: translateY(-1px); }
-
         .empty-state { text-align: center; padding: 48px 24px; font-size: 13px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
         .results-count { font-size: 12px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 20px; }
         .results-count span { color: var(--accent-terra); font-weight: 700; }
@@ -375,8 +365,8 @@ export default function Home() {
         .footer-hex span { font-family: "Raleway", sans-serif; font-size: 9px; font-weight: 700; color: #fff; }
         .footer-name { font-family: "Raleway", sans-serif; font-size: 14px; font-weight: 700; color: #9E6650; letter-spacing: 2px; text-transform: uppercase; }
         .footer-copy { font-size: 12px; color: #A8978E; }
-        .footer-links { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 8px; flex-wrap: wrap; }
-        .footer-link { font-size: 11px; color: #B0A090; text-decoration: none; white-space: nowrap; }
+        .footer-links { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 8px; }
+        .footer-link { font-size: 11px; color: #B0A090; text-decoration: none; }
         .footer-link:hover { color: #C28266; }
         .footer-sep { color: #D4C4B8; font-size: 10px; }
       `}</style>
@@ -448,19 +438,18 @@ export default function Home() {
         </div>
       )}
 
-      {/* Quick links corrigidos */}
       <div className="quick-links">
-        <Link href="/fretes" className="quick-link-card">
+        <Link href="/fretes" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit" }}>
           <div className="quick-banner-icon">🚚</div>
           <div className="quick-banner-text"><strong>Tabela de Fretes</strong><span>Valores de entrega</span></div>
         </Link>
-        <Link href="/regras" className="quick-link-card">
+        <Link href="/regras" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit" }}>
           <div className="quick-banner-icon">📋</div>
           <div className="quick-banner-text"><strong>Regras de Envio</strong><span>Como funciona</span></div>
         </Link>
       </div>
 
-      <Link href="/curiosidades" className="quick-link-card" style={{ marginBottom: "12px", display: "flex" }}>
+      <Link href="/curiosidades" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit", marginBottom: "12px" }}>
         <div className="quick-banner-icon">💡</div>
         <div className="quick-banner-text"><strong>Curiosidades</strong><span>Dicas e fatos rápidos</span></div>
       </Link>
@@ -485,7 +474,7 @@ export default function Home() {
             const totalProds = cat.brands.reduce((a, b) => a + b.products.length, 0);
             const outProds = cat.brands.reduce((a, b) => a + b.products.filter((p) => p.is_out_of_stock || (p.stock ?? 0) <= 0).length, 0);
             return (
-              <div className="cat-block" key={cat.id} style={{ animationDelay: `${ci * 0.07}s` }}>
+              <div className={`cat-block`} key={cat.id} style={{ animationDelay: `${ci * 0.07}s` }}>
                 <div className="cat-header" onClick={(e) => { (e.currentTarget.parentElement as HTMLElement)?.classList.toggle("open"); }}>
                   <div className="cat-icon">{cat.abbr}</div>
                   <div className="cat-info">
@@ -508,7 +497,7 @@ export default function Home() {
                         <span className="brand-count">{brand.products.length} produto{brand.products.length !== 1 ? "s" : ""}</span>
                         <span className="brand-arrow">▼</span>
                       </div>
-                      <div className="brand-body">
+                      <div className="brand-body" style={{ padding: "12px 16px 14px" }}>
                         {brand.products.map((p) => {
                           const outOfStock = p.is_out_of_stock || (p.stock ?? 0) <= 0;
                           const descParts = (p.description || "").split(" ");
@@ -516,41 +505,31 @@ export default function Home() {
                           const dosagem = descParts[descParts.length - 1] || "—";
                           return (
                             <div className={`product-card-row ${outOfStock ? "out" : ""}`} key={p.id}>
-                              {/* Imagem / Placeholder */}
                               {(p as any).image_url ? (
                                 <img src={(p as any).image_url} alt={p.name} className="pc-img" />
                               ) : (
                                 <div className="pc-placeholder">{(p.name || "").slice(0, 2).toUpperCase()}</div>
                               )}
-
-                              {/* Info */}
                               <div className="pc-info">
                                 <div className="pc-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
                                 <div className="pc-brand">{p.brand}</div>
-                                <div className="pc-apresentacao">{apresentacao}</div>
-                                <div className="pc-dosagem">{dosagem}</div>
                               </div>
-
-                              {/* Direita: preço + status/botão */}
-                              <div className="pc-right">
-                                {!outOfStock && (
-                                  <div className="pc-price">
-                                    R$ {Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                                  </div>
-                                )}
-                                {outOfStock ? (
-                                  <span className="pc-status-out">Em Falta</span>
-                                ) : (
-                                  <button
-                                    className="pc-add-btn"
-                                    onClick={() => addToCart(p)}
-                                    disabled={addingId === p.id}
-                                    title="Adicionar ao carrinho"
-                                  >
-                                    {addingId === p.id ? "..." : <ShoppingCart size={16} />}
-                                  </button>
-                                )}
+                              <div className="pc-meta">
+                                <span className="pc-apresentacao">{apresentacao}</span>
+                                <span className="pc-dosagem">{dosagem}</span>
                               </div>
+                              <div className="pc-price">
+                                {p.price ? `R$ ${Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                              </div>
+                              <span className={`pc-status ${outOfStock ? "unavailable" : "available"}`}>
+                                {outOfStock ? "Em Falta" : "Disponível"}
+                              </span>
+                              {!outOfStock && (
+                                <button className="pc-add-btn" onClick={() => addToCart(p)} disabled={addingId === p.id}>
+                                  <ShoppingCart size={14} />
+                                  {addingId === p.id ? "..." : "Adicionar"}
+                                </button>
+                              )}
                             </div>
                           );
                         })}
@@ -628,7 +607,7 @@ export default function Home() {
                       <div className="cart-item-qty">
                         <button className="qty-btn" onClick={() => updateQty(item, -1)} disabled={cartLoading}><Minus size={12} /></button>
                         <span className="qty-val">{item.quantity}</span>
-                        <button className="qty-btn" onClick={() => updateQty(item, +1)} disabled={cartLoading}><ShoppingCart size={12} /></button>
+                        <button className="qty-btn" onClick={() => updateQty(item, +1)} disabled={cartLoading}><Plus size={12} /></button>
                       </div>
                     </div>
                     <button className="cart-remove" onClick={() => removeItem(item)} disabled={cartLoading}><X size={16} /></button>
