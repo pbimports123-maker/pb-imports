@@ -299,30 +299,27 @@ export default function Home() {
         .brand-block.open .brand-body { display: block; }
         .brand-body { display: none; border-top: 1px solid var(--border-dim); padding: 8px 0; }
 
-        /* Produto em lista */
-        .product-list-header { display: grid; grid-template-columns: 1fr 140px 120px 80px 120px; gap: 8px; padding: 8px 18px; font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-dim); }
-        .product-list-row { display: grid; grid-template-columns: 1fr 140px 120px 80px 120px; gap: 8px; padding: 10px 18px; align-items: center; border-bottom: 1px solid rgba(194,130,102,0.06); transition: background 0.15s; }
-        .product-list-row:last-child { border-bottom: none; }
-        .product-list-row:hover { background: rgba(194,130,102,0.04); }
-        .product-list-row.out { opacity: 0.6; }
-        .pl-name { font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
-        .pl-apresentacao { font-size: 12px; color: var(--text-muted); }
-        .pl-dosagem { font-size: 12px; color: var(--text-muted); }
-        .pl-preco { font-family: "Raleway", sans-serif; font-size: 13px; font-weight: 700; color: var(--accent-terra-dark); }
-        .pl-status { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; border: 1px solid; border-radius: 20px; }
-        .pl-status.available { border-color: rgba(122,175,144,0.5); color: var(--accent-sage); background: rgba(122,175,144,0.1); }
-        .pl-status.unavailable { border-color: rgba(192,97,79,0.4); color: var(--accent-red); background: rgba(192,97,79,0.08); }
-        .pl-add-btn { display: flex; align-items: center; gap: 4px; padding: 5px 10px; background: var(--accent-terra); color: #fff; border: none; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
-        .pl-add-btn:hover { background: var(--accent-terra-dark); }
-        .pl-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .pl-actions { display: flex; align-items: center; gap: 6px; }
-
-        @media (max-width: 640px) {
-          .product-list-header { grid-template-columns: 1fr 80px 80px; }
-          .product-list-header .hide-mobile { display: none; }
-          .product-list-row { grid-template-columns: 1fr 80px 80px; }
-          .product-list-row .hide-mobile { display: none; }
-        }
+        /* Produto em card horizontal */
+        .product-card-row { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 12px; margin-bottom: 8px; transition: all 0.2s; }
+        .product-card-row:hover { border-color: var(--accent-terra-light); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(194,130,102,0.12); }
+        .product-card-row.out { opacity: 0.65; }
+        .pc-img { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex-shrink: 0; border: 1px solid rgba(194,130,102,0.2); }
+        .pc-placeholder { width: 44px; height: 44px; border-radius: 8px; background: linear-gradient(135deg, #C28266, #9E6650); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; font-weight: 700; color: #fff; font-family: "Raleway", sans-serif; }
+        .pc-info { flex: 1; min-width: 0; }
+        .pc-name { font-size: 14px; font-weight: 700; color: var(--text-primary); line-height: 1.3; margin-bottom: 2px; }
+        .pc-brand { font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px; }
+        .pc-meta { display: flex; align-items: center; gap: 16px; }
+        .pc-apresentacao { font-size: 12px; color: var(--text-muted); }
+        .pc-dosagem { font-size: 12px; color: var(--text-muted); }
+        .pc-price { font-family: "Raleway", sans-serif; font-size: 16px; font-weight: 700; color: var(--accent-terra-dark); white-space: nowrap; }
+        .pc-status { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; border: 1px solid; border-radius: 20px; white-space: nowrap; }
+        .pc-status.available { border-color: rgba(122,175,144,0.5); color: var(--accent-sage); background: rgba(122,175,144,0.1); }
+        .pc-status.available::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--accent-sage); }
+        .pc-status.unavailable { border-color: rgba(192,97,79,0.4); color: var(--accent-red); background: rgba(192,97,79,0.08); }
+        .pc-status.unavailable::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--accent-red); }
+        .pc-add-btn { display: flex; align-items: center; gap: 6px; padding: 9px 14px; background: var(--accent-terra); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0; font-family: "Raleway", sans-serif; }
+        .pc-add-btn:hover { background: var(--accent-terra-dark); transform: translateY(-1px); }
+        .pc-add-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
         /* Carrinho */
         .cart-overlay { position: fixed; inset: 0; background: rgba(13,15,19,0.4); z-index: 100; backdrop-filter: blur(4px); animation: fadeIn 0.2s ease; }
@@ -500,51 +497,39 @@ export default function Home() {
                         <span className="brand-count">{brand.products.length} produto{brand.products.length !== 1 ? "s" : ""}</span>
                         <span className="brand-arrow">▼</span>
                       </div>
-                      <div className="brand-body">
-                        {/* Cabeçalho da lista */}
-                        <div className="product-list-header">
-                          <span>Produto</span>
-                          <span>Apresentação</span>
-                          <span>Dosagem</span>
-                          <span>Preço</span>
-                          <span>Estoque</span>
-                        </div>
-                        {/* Linhas de produtos */}
+                      <div className="brand-body" style={{ padding: "12px 16px 14px" }}>
                         {brand.products.map((p) => {
                           const outOfStock = p.is_out_of_stock || (p.stock ?? 0) <= 0;
                           const descParts = (p.description || "").split(" ");
-                          const apresentacao = descParts.slice(0, -1).join(" ") || p.description || "—";
+                          const apresentacao = descParts.slice(0, -1).join(" ") || "—";
                           const dosagem = descParts[descParts.length - 1] || "—";
                           return (
-                            <div className={`product-list-row ${outOfStock ? "out" : ""}`} key={p.id}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                {(p as any).image_url ? (
-                                  <img src={(p as any).image_url} alt={p.name} style={{ width: 36, height: 36, borderRadius: 6, objectFit: "cover", flexShrink: 0, border: "1px solid rgba(194,130,102,0.2)" }} />
-                                ) : (
-                                  <div style={{ width: 36, height: 36, borderRadius: 6, background: "linear-gradient(135deg, #C28266, #9E6650)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 11, fontWeight: 700, color: "#fff", fontFamily: "Raleway, sans-serif" }}>
-                                    {(p.name || "").slice(0, 2).toUpperCase()}
-                                  </div>
-                                )}
-                                <div className="pl-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
+                            <div className={`product-card-row ${outOfStock ? "out" : ""}`} key={p.id}>
+                              {(p as any).image_url ? (
+                                <img src={(p as any).image_url} alt={p.name} className="pc-img" />
+                              ) : (
+                                <div className="pc-placeholder">{(p.name || "").slice(0, 2).toUpperCase()}</div>
+                              )}
+                              <div className="pc-info">
+                                <div className="pc-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
+                                <div className="pc-brand">{p.brand}</div>
                               </div>
-                              <div className="pl-apresentacao hide-mobile">{apresentacao}</div>
-                              <div className="pl-dosagem hide-mobile">{dosagem}</div>
-                              <div className="pl-preco">
+                              <div className="pc-meta">
+                                <span className="pc-apresentacao">{apresentacao}</span>
+                                <span className="pc-dosagem">{dosagem}</span>
+                              </div>
+                              <div className="pc-price">
                                 {p.price ? `R$ ${Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
                               </div>
-                              <div className="pl-actions">
-                                {outOfStock ? (
-                                  <span className="pl-status unavailable">Em Falta</span>
-                                ) : (
-                                  <>
-                                    <span className="pl-status available">{p.stock} un.</span>
-                                    <button className="pl-add-btn" onClick={() => addToCart(p)} disabled={addingId === p.id}>
-                                      <Plus size={11} />
-                                      {addingId === p.id ? "..." : "Add"}
-                                    </button>
-                                  </>
-                                )}
-                              </div>
+                              <span className={`pc-status ${outOfStock ? "unavailable" : "available"}`}>
+                                {outOfStock ? "Em Falta" : "Disponível"}
+                              </span>
+                              {!outOfStock && (
+                                <button className="pc-add-btn" onClick={() => addToCart(p)} disabled={addingId === p.id}>
+                                  <ShoppingCart size={14} />
+                                  {addingId === p.id ? "..." : "Adicionar"}
+                                </button>
+                              )}
                             </div>
                           );
                         })}
