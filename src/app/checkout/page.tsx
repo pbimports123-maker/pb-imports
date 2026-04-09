@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ChevronLeft, ShieldCheck, Truck, Package, AlertCircle } from "lucide-react";
+import { ChevronLeft, ShieldCheck, Truck, Package, AlertCircle, Tag, X, CheckCircle } from "lucide-react";
 
 type CartItem = {
   cart_item_id: string;
@@ -18,6 +18,16 @@ type ShippingRate = {
   region: string;
   service_type: string;
   price: number;
+};
+
+type Coupon = {
+  id: string;
+  code: string;
+  type: "free_shipping" | "percentage";
+  value: number;
+  max_uses: number | null;
+  used_count: number;
+  is_active: boolean;
 };
 
 type FormData = {
@@ -75,6 +85,11 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<"form" | "summary">("form");
   const [cepLoading, setCepLoading] = useState(false);
+
+  // Cupom
+  const [couponCode, setCouponCode] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
 
   const [form, setForm] = useState<FormData>({
     name: "", cpf: "", phone: "",
@@ -138,12 +153,22 @@ export default function CheckoutPage() {
     setSelectedShipping(null);
   }, [hasInsurance, allShippingRates]);
 
+  // Cálculos com cupom
   const subtotal = cartItems.reduce((sum, i) => sum + Number(i.product.price) * i.quantity, 0);
   const shippingPrice = selectedShipping ? Number(selectedShipping.price) : 0;
   const insurancePrice = hasInsurance ? subtotal * 0.15 : 0;
-  const total = subtotal + shippingPrice + insurancePrice;
 
-  // Busca CEP via ViaCEP
+  const couponDiscount = (() => {
+    if (!appliedCoupon) return 0;
+    if (appliedCoupon.type === "free_shipping") return shippingPrice;
+    if (appliedCoupon.type === "percentage") return subtotal * (appliedCoupon.value / 100);
+    return 0;
+  })();
+
+  const shippingFinal = appliedCoupon?.type === "free_shipping" ? 0 : shippingPrice;
+  const total = subtotal + shippingFinal + insurancePrice - (appliedCoupon?.type === "percentage" ? couponDiscount : 0);
+
+  // Busca CEP
   const fetchCep = async (cep: string) => {
     try {
       setCepLoading(true);
@@ -171,12 +196,51 @@ export default function CheckoutPage() {
     if (field === "phone") value = formatPhone(raw);
     if (field === "zip") value = formatZip(raw);
     setForm((prev) => ({ ...prev, [field]: value }));
-
-    // Busca CEP automaticamente quando completo
     if (field === "zip") {
       const digits = raw.replace(/\D/g, "");
       if (digits.length === 8) fetchCep(digits);
     }
+  };
+
+  // Aplicar cupom
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("code", couponCode.trim().toUpperCase())
+        .eq("is_active", true)
+        .single();
+
+      if (error || !data) {
+        toast.error("Cupom inválido ou não encontrado");
+        return;
+      }
+
+      if (data.max_uses !== null && data.used_count >= data.max_uses) {
+        toast.error("Cupom esgotado");
+        return;
+      }
+
+      setAppliedCoupon(data);
+      toast.success(
+        data.type === "free_shipping"
+          ? "🎉 Frete grátis aplicado!"
+          : `🎉 Desconto de ${data.value}% aplicado!`
+      );
+    } catch {
+      toast.error("Erro ao validar cupom");
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    toast.success("Cupom removido");
   };
 
   const validateForm = () => {
@@ -218,17 +282,27 @@ export default function CheckoutPage() {
           address_city: form.city,
           address_state: form.state,
           shipping_type: selectedShipping!.service_type,
-          shipping_price: shippingPrice,
+          shipping_price: shippingFinal,
           has_insurance: hasInsurance,
           insurance_price: insurancePrice,
           subtotal,
           total,
           payment_method: "pix",
           payment_status: "pending",
+          coupon_code: appliedCoupon?.code || null,
+          coupon_discount: couponDiscount || null,
         })
         .select("id")
         .single();
       if (orderErr) throw orderErr;
+
+      // Incrementa uso do cupom
+      if (appliedCoupon) {
+        await supabase
+          .from("coupons")
+          .update({ used_count: appliedCoupon.used_count + 1 })
+          .eq("id", appliedCoupon.id);
+      }
 
       const orderItems = cartItems.map((i) => ({
         order_id: order.id,
@@ -285,13 +359,11 @@ export default function CheckoutPage() {
       <style jsx>{`
         .co-root { min-height: 100vh; background: #FAF8EF; padding: 32px 16px 80px; }
         .co-wrap { max-width: 980px; margin: 0 auto; }
-
         .co-top { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
         .back-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: #fff; border: 1px solid rgba(194,130,102,0.25); border-radius: 8px; color: #7A6558; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; transition: all 0.2s; }
         .back-btn:hover { border-color: #C28266; color: #C28266; }
         .co-title { font-family: "Raleway", sans-serif; font-size: 24px; font-weight: 700; color: #0D0F13; }
         .co-title span { color: #C28266; }
-
         .steps { display: flex; align-items: center; gap: 8px; margin-bottom: 32px; }
         .step { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #B0A090; }
         .step.active { color: #C28266; }
@@ -300,14 +372,11 @@ export default function CheckoutPage() {
         .step.active .step-num { background: #C28266; color: #fff; }
         .step.done .step-num { background: #7AAF90; color: #fff; }
         .step-sep { flex: 1; height: 1px; background: rgba(194,130,102,0.2); }
-
         .co-grid { display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start; }
         @media (max-width: 780px) { .co-grid { grid-template-columns: 1fr; } }
-
         .card { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 14px; padding: 24px; margin-bottom: 16px; }
         .card-title { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #0D0F13; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
         .card-title svg { color: #C28266; }
-
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
         .form-row.triple { grid-template-columns: 1fr 1fr 1fr; }
         @media (max-width: 540px) { .form-row, .form-row.triple { grid-template-columns: 1fr; } }
@@ -319,6 +388,21 @@ export default function CheckoutPage() {
         .field input:disabled { opacity: 0.6; cursor: not-allowed; }
         .cep-hint { font-size: 11px; color: #C28266; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
 
+        /* Cupom */
+        .coupon-wrap { display: flex; gap: 10px; }
+        .coupon-input { flex: 1; padding: 11px 14px; background: #FAF8EF; border: 1px solid rgba(194,130,102,0.25); border-radius: 8px; color: #0D0F13; font-family: "DM Sans", sans-serif; font-size: 15px; outline: none; transition: all 0.2s; text-transform: uppercase; letter-spacing: 1px; }
+        .coupon-input:focus { border-color: #C28266; box-shadow: 0 0 0 3px rgba(194,130,102,0.12); }
+        .coupon-input::placeholder { text-transform: none; letter-spacing: 0; color: #C8B8AE; }
+        .coupon-btn { padding: 11px 20px; background: #C28266; color: #fff; border: none; border-radius: 8px; font-family: "Raleway", sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+        .coupon-btn:hover { background: #9E6650; }
+        .coupon-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .coupon-applied { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(122,175,144,0.08); border: 1px solid rgba(122,175,144,0.3); border-radius: 10px; margin-top: 10px; }
+        .coupon-applied-info { display: flex; align-items: center; gap: 10px; }
+        .coupon-applied-code { font-family: "Raleway", sans-serif; font-size: 14px; font-weight: 700; color: #5A8F70; letter-spacing: 1px; }
+        .coupon-applied-desc { font-size: 12px; color: #7A6558; margin-top: 2px; }
+        .coupon-remove { background: none; border: none; color: #C0614F; cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center; }
+        .coupon-remove:hover { background: rgba(192,97,79,0.1); }
+
         .shipping-opts { display: flex; flex-direction: column; gap: 10px; }
         .shipping-opt { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1.5px solid rgba(194,130,102,0.2); border-radius: 10px; cursor: pointer; transition: all 0.2s; }
         .shipping-opt:hover { border-color: #C28266; background: rgba(194,130,102,0.04); }
@@ -328,8 +412,8 @@ export default function CheckoutPage() {
         .shipping-name { font-size: 14px; font-weight: 600; color: #0D0F13; }
         .shipping-desc { font-size: 12px; color: #A8978E; margin-top: 2px; }
         .shipping-price { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #C28266; }
+        .shipping-price.free { color: #5A8F70; text-decoration: line-through; }
         .no-state { font-size: 13px; color: #B0A090; text-align: center; padding: 20px 0; }
-
         .insurance-card { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border: 1.5px solid rgba(194,130,102,0.2); border-radius: 10px; cursor: pointer; transition: all 0.2s; }
         .insurance-card:hover { border-color: #C28266; }
         .insurance-card.selected { border-color: #C28266; background: rgba(194,130,102,0.06); }
@@ -337,7 +421,6 @@ export default function CheckoutPage() {
         .insurance-title { font-size: 14px; font-weight: 600; color: #0D0F13; margin-bottom: 4px; }
         .insurance-desc { font-size: 12px; color: #7A6558; line-height: 1.5; }
         .insurance-price { font-family: "Raleway", sans-serif; font-size: 14px; font-weight: 700; color: #C28266; margin-top: 6px; }
-
         .summary-card { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 14px; padding: 24px; position: sticky; top: 24px; }
         .summary-title { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #0D0F13; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 18px; }
         .summary-items { margin-bottom: 18px; }
@@ -350,17 +433,16 @@ export default function CheckoutPage() {
         .summary-line { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; }
         .summary-line span { color: #7A6558; }
         .summary-line strong { color: #0D0F13; font-weight: 600; }
+        .summary-line.discount strong { color: #5A8F70; }
         .summary-total { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 2px solid rgba(194,130,102,0.2); }
         .summary-total span { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #0D0F13; }
         .summary-total strong { font-family: "Raleway", sans-serif; font-size: 22px; font-weight: 700; color: #9E6650; }
         .pix-badge { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: rgba(122,175,144,0.1); border: 1px solid rgba(122,175,144,0.3); border-radius: 8px; margin-top: 14px; font-size: 12px; color: #5A8F70; font-weight: 500; }
-
         .btn-primary { width: 100%; padding: 15px; background: #C28266; color: #fff; border: none; border-radius: 10px; font-family: "Raleway", sans-serif; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 20px; letter-spacing: 0.3px; }
         .btn-primary:hover { background: #9E6650; transform: translateY(-1px); }
         .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
         .btn-secondary { width: 100%; padding: 12px; background: transparent; color: #C28266; border: 1.5px solid rgba(194,130,102,0.4); border-radius: 10px; font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; margin-top: 10px; }
         .btn-secondary:hover { background: rgba(194,130,102,0.06); }
-
         .final-summary { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 14px; padding: 28px; max-width: 600px; margin: 0 auto; }
         .fs-header { text-align: center; margin-bottom: 24px; }
         .fs-title { font-family: "Raleway", sans-serif; font-size: 22px; font-weight: 700; color: #0D0F13; margin-bottom: 6px; }
@@ -433,13 +515,7 @@ export default function CheckoutPage() {
                 <div className="form-row">
                   <div className="field">
                     <label>CEP *</label>
-                    <input
-                      placeholder="00000-000"
-                      value={form.zip}
-                      onChange={(e) => handleInput("zip", e.target.value)}
-                      disabled={cepLoading}
-                      style={cepLoading ? { borderColor: "#C28266", opacity: 0.7 } : {}}
-                    />
+                    <input placeholder="00000-000" value={form.zip} onChange={(e) => handleInput("zip", e.target.value)} disabled={cepLoading} style={cepLoading ? { borderColor: "#C28266", opacity: 0.7 } : {}} />
                     {cepLoading && <span className="cep-hint">🔍 Buscando endereço...</span>}
                   </div>
                   <div className="field">
@@ -500,9 +576,45 @@ export default function CheckoutPage() {
                             {rate.service_type === "VIP" && "Entrega prioritária • 1 a 3 dias úteis"}
                           </div>
                         </div>
-                        <span className="shipping-price">R$ {Number(rate.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                        <span className={`shipping-price ${appliedCoupon?.type === "free_shipping" ? "free" : ""}`}>
+                          {appliedCoupon?.type === "free_shipping" ? "GRÁTIS" : `R$ ${Number(rate.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
+                        </span>
                       </label>
                     ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Cupom */}
+              <div className="card">
+                <div className="card-title"><Tag size={16} /> Cupom de Desconto</div>
+                {!appliedCoupon ? (
+                  <div className="coupon-wrap">
+                    <input
+                      className="coupon-input"
+                      placeholder="Digite o código do cupom"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => e.key === "Enter" && applyCoupon()}
+                    />
+                    <button className="coupon-btn" onClick={applyCoupon} disabled={couponLoading || !couponCode.trim()}>
+                      {couponLoading ? "..." : "Aplicar"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="coupon-applied">
+                    <div className="coupon-applied-info">
+                      <CheckCircle size={18} color="#5A8F70" />
+                      <div>
+                        <div className="coupon-applied-code">{appliedCoupon.code}</div>
+                        <div className="coupon-applied-desc">
+                          {appliedCoupon.type === "free_shipping" ? "Frete grátis" : `${appliedCoupon.value}% de desconto`}
+                        </div>
+                      </div>
+                    </div>
+                    <button className="coupon-remove" onClick={removeCoupon}>
+                      <X size={16} />
+                    </button>
                   </div>
                 )}
               </div>
@@ -514,9 +626,7 @@ export default function CheckoutPage() {
                   <input type="checkbox" checked={hasInsurance} onChange={(e) => setHasInsurance(e.target.checked)} />
                   <div>
                     <div className="insurance-title">🔒 Proteger meu pedido</div>
-                    <div className="insurance-desc">
-                      Garante o reenvio ou reembolso caso o pedido seja interceptado, extraviado ou perdido no transporte. Recomendado para pedidos acima de R$ 500.
-                    </div>
+                    <div className="insurance-desc">Garante o reenvio ou reembolso caso o pedido seja interceptado, extraviado ou perdido no transporte.</div>
                     {hasInsurance && (
                       <>
                         <div className="insurance-price">+ R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (15% do subtotal)</div>
@@ -547,9 +657,15 @@ export default function CheckoutPage() {
                 </div>
                 <div className="summary-divider" />
                 <div className="summary-line"><span>Subtotal produtos</span><strong>R$ {subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
-                <div className="summary-line"><span>Frete ({selectedShipping?.service_type || "—"})</span><strong>{selectedShipping ? `R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}</strong></div>
+                <div className="summary-line">
+                  <span>Frete ({selectedShipping?.service_type || "—"})</span>
+                  <strong>{selectedShipping ? (appliedCoupon?.type === "free_shipping" ? "GRÁTIS" : `R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`) : "—"}</strong>
+                </div>
                 {hasInsurance && (
                   <div className="summary-line"><span>🔒 Seguro (15%)</span><strong>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
+                )}
+                {appliedCoupon?.type === "percentage" && couponDiscount > 0 && (
+                  <div className="summary-line discount"><span>🎟️ Cupom ({appliedCoupon.value}%)</span><strong>- R$ {couponDiscount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
                 )}
                 <div className="summary-total">
                   <span>Total</span>
@@ -591,9 +707,15 @@ export default function CheckoutPage() {
             </div>
             <div className="fs-total-box">
               <div className="fs-total-row"><span>Subtotal produtos</span><strong>R$ {subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
-              <div className="fs-total-row"><span>Frete {selectedShipping?.service_type}</span><strong>R$ {shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
+              <div className="fs-total-row"><span>Frete {selectedShipping?.service_type}</span><strong>{appliedCoupon?.type === "free_shipping" ? "GRÁTIS" : `R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}</strong></div>
               {hasInsurance && (
                 <div className="fs-total-row"><span>🔒 Seguro de envio (15%)</span><strong style={{ color: "#C0614F" }}>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
+              )}
+              {appliedCoupon?.type === "percentage" && couponDiscount > 0 && (
+                <div className="fs-total-row"><span>🎟️ Cupom ({appliedCoupon.value}%)</span><strong style={{ color: "#5A8F70" }}>- R$ {couponDiscount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
+              )}
+              {appliedCoupon && (
+                <div className="fs-total-row"><span>🎟️ Cupom aplicado</span><strong style={{ color: "#5A8F70" }}>{appliedCoupon.code}</strong></div>
               )}
               <div className="fs-total-final">
                 <span>Total a pagar</span>

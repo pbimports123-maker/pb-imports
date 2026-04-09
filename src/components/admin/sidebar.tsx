@@ -12,6 +12,7 @@ type MenuItem = { label: string; href: string; icon: string };
 const MENU_ITEMS: MenuItem[] = [
   { label: "Dashboard", href: "/admin", icon: "◈" },
   { label: "Produtos", href: "/admin/products", icon: "◉" },
+  { label: "Cupons", href: "/admin/coupons", icon: "⌁" },
   { label: "Fretes", href: "/admin/shipping", icon: "⟁" },
   { label: "Regras", href: "/admin/rules", icon: "⊛" },
   { label: "Curiosidades", href: "/admin/curiosidades", icon: "✦" },
