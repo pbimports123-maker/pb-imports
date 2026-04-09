@@ -530,13 +530,7 @@ export default function Home() {
             <span className="footer-name">PB Imports</span>
           </div>
           <p className="footer-copy">© {new Date().getFullYear()} PB Imports — Todos os direitos reservados.</p>
-          <p className="footer-cnpj">CNPJ: 63.965.018/0001-48 · São Paulo, SP · Brasil</p>
           <div className="footer-links">
-            <Link href="/fretes" className="footer-link">Tabela de Fretes</Link>
-            <span className="footer-sep">·</span>
-            <Link href="/regras" className="footer-link">Regras de Envio</Link>
-            <span className="footer-sep">·</span>
-            <Link href="/curiosidades" className="footer-link">Curiosidades</Link>
           </div>
         </div>
       </div>
