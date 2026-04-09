@@ -7,46 +7,48 @@ import { toast } from "sonner";
 import { ShoppingCart, Plus, Minus, X } from "lucide-react";
 import { Product, Category } from "@/types/product";
 
-// ── Tipos ────────────────────────────────────────────────────
 type BrandGroup = { name: string; products: Product[] };
 type CategoryGroup = { id: string; name: string; abbr: string; brands: BrandGroup[] };
 type CartItem = { cart_item_id: string; product: Product; quantity: number };
 
-// ── Utilitário: session_id persistente no localStorage ───────
 function getSessionId(): string {
   if (typeof window === "undefined") return "";
   let sid = localStorage.getItem("pb_session_id");
-  if (!sid) {
-    sid = crypto.randomUUID();
-    localStorage.setItem("pb_session_id", sid);
-  }
+  if (!sid) { sid = crypto.randomUUID(); localStorage.setItem("pb_session_id", sid); }
   return sid;
 }
 
-// ── Utilitário: última visita no localStorage ────────────────
 const LAST_VISIT_KEY = "pb_last_visit";
-
 function getLastVisit(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(LAST_VISIT_KEY);
 }
-
 function saveLastVisit(): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
 }
 
-// ── Componente principal ─────────────────────────────────────
+const PRINCIPIOS_ATIVOS = ["Tirzepatida", "Retatrutida", "Semaglutida"];
+const TIRZEPATIDA_MARCAS = ["lipoland", "mounjaro"];
+
+function getEmagrecedorGroup(productName: string): string {
+  const lower = (productName || "").toLowerCase();
+  if (TIRZEPATIDA_MARCAS.some((m) => lower.includes(m))) return "Tirzepatida";
+  const found = PRINCIPIOS_ATIVOS.find((pa) => lower.includes(pa.toLowerCase()));
+  if (!found && lower.includes("retatrutide")) return "Retatrutida";
+  return found || "Outros";
+}
+
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
   const [updatesCount, setUpdatesCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
-  // Carrinho
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
@@ -54,7 +56,6 @@ export default function Home() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // ── Carrega produtos e categorias ────────────────────────
   useEffect(() => {
     async function fetchData() {
       try {
@@ -78,10 +79,7 @@ export default function Home() {
             const last = new Date(lastVisit).getTime();
             return updated > last;
           }).length;
-          if (count > 0) {
-            setUpdatesCount(count);
-            setShowBanner(true);
-          }
+          if (count > 0) { setUpdatesCount(count); setShowBanner(true); }
         }
         saveLastVisit();
       } catch (err: any) {
@@ -99,24 +97,16 @@ export default function Home() {
     const sid = getSessionId();
     if (!sid) return;
     try {
-      let { data: cart } = await supabase
-        .from("carts").select("id").eq("session_id", sid).single();
+      let { data: cart } = await supabase.from("carts").select("id").eq("session_id", sid).single();
       if (!cart) {
-        const { data: newCart, error } = await supabase
-          .from("carts").insert({ session_id: sid }).select("id").single();
+        const { data: newCart, error } = await supabase.from("carts").insert({ session_id: sid }).select("id").single();
         if (error) throw error;
         cart = newCart;
       }
       const { data: items, error: itemsErr } = await supabase
-        .from("cart_items")
-        .select("id, quantity, product:products(*)")
-        .eq("cart_id", cart.id);
+        .from("cart_items").select("id, quantity, product:products(*)").eq("cart_id", cart.id);
       if (itemsErr) throw itemsErr;
-      setCartItems((items || []).map((i: any) => ({
-        cart_item_id: i.id,
-        product: i.product,
-        quantity: i.quantity,
-      })));
+      setCartItems((items || []).map((i: any) => ({ cart_item_id: i.id, product: i.product, quantity: i.quantity })));
     } catch (err: any) {
       console.error("Erro ao carregar carrinho:", err);
     }
@@ -129,11 +119,9 @@ export default function Home() {
     const sid = getSessionId();
     setAddingId(product.id);
     try {
-      let { data: cart } = await supabase
-        .from("carts").select("id").eq("session_id", sid).single();
+      let { data: cart } = await supabase.from("carts").select("id").eq("session_id", sid).single();
       if (!cart) {
-        const { data: newCart, error } = await supabase
-          .from("carts").insert({ session_id: sid }).select("id").single();
+        const { data: newCart, error } = await supabase.from("carts").insert({ session_id: sid }).select("id").single();
         if (error) throw error;
         cart = newCart;
       }
@@ -196,6 +184,7 @@ export default function Home() {
 
   const groups: CategoryGroup[] = useMemo(() => {
     const normalized = categories.map((cat) => {
+      const isEmagrecedores = (cat.name || "").toLowerCase() === "emagrecedores";
       const catProducts = products.filter((p) => p.category_id === cat.id);
       const filtered = catProducts.filter((p) => {
         if (!search) return true;
@@ -206,34 +195,14 @@ export default function Home() {
           (cat.name || "").toLowerCase().includes(s)
         );
       });
-      const isEmagrecedores = (cat.name || "").toLowerCase() === "emagrecedores";
-      const PRINCIPIOS = ["Tirzepatida", "Retatrutida", "Semaglutida"];
-      const brandsMap = new Map<string, Product[]>();
+
+      const groupMap = new Map<string, Product[]>();
       filtered.forEach((p) => {
-        let key: string;
-        if (isEmagrecedores) {
-          const TIRZEPATIDA_MARCAS = ["lipoland", "mounjaro"];
-          const isTirzepatidaMarca = TIRZEPATIDA_MARCAS.some((m) =>
-            (p.name || "").toLowerCase().includes(m)
-          );
-          if (isTirzepatidaMarca) {
-            key = "Tirzepatida";
-          } else {
-            const found = PRINCIPIOS.find((pa) =>
-              (p.name || "").toLowerCase().includes(pa.toLowerCase())
-            );
-            if (!found && (p.name || "").toLowerCase().includes("retatrutide")) {
-              key = "Retatrutida";
-            } else {
-              key = found || "Outros";
-            }
-          }
-        } else {
-          key = p.brand || "Outros";
-        }
-        brandsMap.set(key, [...(brandsMap.get(key) || []), p]);
+        const key = isEmagrecedores ? getEmagrecedorGroup(p.name || "") : (p.brand || "Outros");
+        groupMap.set(key, [...(groupMap.get(key) || []), p]);
       });
-      const brands: BrandGroup[] = Array.from(brandsMap.entries()).map(([name, products]) => ({ name, products }));
+
+      const brands: BrandGroup[] = Array.from(groupMap.entries()).map(([name, products]) => ({ name, products }));
       return { id: cat.id, name: cat.name || "Sem Categoria", abbr: (cat.name || "??").slice(0, 2).toUpperCase(), brands };
     });
     return normalized.filter((c) => c.brands.length > 0);
@@ -250,10 +219,10 @@ export default function Home() {
         :root {
           --bg-void: #FAF8EF; --bg-panel: #F2EDE0; --bg-card: #FFFFFF; --bg-card2: #EDE8DA;
           --accent-terra: #C28266; --accent-terra-light: #D9A890; --accent-terra-dark: #9E6650;
-          --accent-rose: #E8C4B2; --accent-sage: #7AAF90; --accent-amber: #D4A96A;
-          --accent-red: #C0614F; --text-primary: #0D0F13; --text-muted: #7A6558;
-          --text-dim: #B0A090; --border-main: rgba(194,130,102,0.22);
-          --border-dim: rgba(194,130,102,0.12); --grid-line: rgba(194,130,102,0.06);
+          --accent-sage: #7AAF90; --accent-amber: #D4A96A; --accent-red: #C0614F;
+          --text-primary: #0D0F13; --text-muted: #7A6558; --text-dim: #B0A090;
+          --border-main: rgba(194,130,102,0.22); --border-dim: rgba(194,130,102,0.12);
+          --grid-line: rgba(194,130,102,0.06);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: var(--bg-void); font-family: "DM Sans", "Raleway", system-ui, sans-serif; color: var(--text-primary); min-height: 100vh; overflow-x: hidden; }
@@ -281,12 +250,11 @@ export default function Home() {
         .badge.green { border-color: var(--accent-sage); color: var(--accent-sage); background: rgba(122,175,144,0.1); }
         .badge.red { border-color: var(--accent-red); color: var(--accent-red); background: rgba(192,97,79,0.08); }
         .search-wrap { position: relative; margin-bottom: 20px; }
-        .search-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 16px; }
+        .search-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 16px; z-index: 1; }
         .search-input { width: 100%; padding: 14px 16px 14px 46px; background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 10px; color: var(--text-primary); font-family: "DM Sans", sans-serif; font-size: 16px; outline: none; transition: all 0.2s; }
         .search-input::placeholder { color: var(--text-dim); }
         .search-input:focus { border-color: var(--accent-terra); box-shadow: 0 0 0 3px rgba(194,130,102,0.12); }
-        .notif-banner { display: flex; align-items: center; gap: 14px; padding: 16px 20px; background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 10px; margin-bottom: 16px; cursor: pointer; transition: all 0.2s; animation: slideIn 0.5s ease both; }
-        .notif-banner:hover { border-color: var(--accent-terra); }
+        .notif-banner { display: flex; align-items: center; gap: 14px; padding: 16px 20px; background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 10px; margin-bottom: 16px; transition: all 0.2s; animation: slideIn 0.5s ease both; }
         .notif-icon { width: 36px; height: 36px; background: rgba(194,130,102,0.1); border: 1px solid var(--border-main); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
         .notif-text strong { display: block; font-size: 15px; font-weight: 600; color: var(--text-primary); }
         .notif-text span { font-size: 12px; color: var(--text-muted); }
@@ -300,6 +268,8 @@ export default function Home() {
         .info-strip .cyan { color: var(--accent-terra); font-weight: 600; }
         .info-strip .red { color: var(--accent-red); font-weight: 600; }
         @keyframes slideIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Categoria */
         .cat-block { margin-bottom: 10px; border: 1px solid var(--border-main); border-radius: 12px; background: var(--bg-card); overflow: hidden; animation: slideIn 0.5s ease both; transition: box-shadow 0.2s; }
         .cat-block:hover { box-shadow: 0 4px 20px rgba(194,130,102,0.1); }
         .cat-header { display: flex; align-items: center; gap: 16px; padding: 18px 24px; cursor: pointer; transition: background 0.2s; user-select: none; }
@@ -316,6 +286,8 @@ export default function Home() {
         .cat-block.open .cat-arrow { transform: rotate(180deg); }
         .cat-body { display: none; border-top: 1px solid var(--border-dim); padding: 12px 16px 16px; }
         .cat-block.open .cat-body { display: block; }
+
+        /* Marca/Grupo */
         .brand-block { margin-bottom: 8px; border: 1px solid var(--border-dim); border-radius: 8px; background: var(--bg-card2); }
         .brand-header { display: flex; align-items: center; gap: 14px; padding: 12px 18px; cursor: pointer; transition: background 0.2s; user-select: none; border-radius: 8px; }
         .brand-header:hover { background: rgba(194,130,102,0.06); }
@@ -325,24 +297,34 @@ export default function Home() {
         .brand-arrow { font-size: 10px; color: var(--text-muted); transition: transform 0.3s; margin-left: 8px; }
         .brand-block.open .brand-arrow { transform: rotate(180deg); }
         .brand-block.open .brand-body { display: block; }
-        .brand-body { display: none; border-top: 1px solid var(--border-dim); padding: 12px 18px 14px; }
-        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
-        .product-card { background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 10px; padding: 16px; transition: all 0.2s; }
-        .product-card:hover { border-color: var(--accent-terra-light); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(194,130,102,0.12); }
-        .product-card.out-of-stock { opacity: 0.65; border-color: rgba(192,97,79,0.2); }
-        .product-name { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; line-height: 1.3; }
-        .product-brand-label { font-size: 11px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
-        .product-price { font-family: "Raleway", sans-serif; font-size: 16px; font-weight: 700; color: var(--accent-terra-dark); margin-bottom: 10px; }
-        .product-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-        .product-status { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; border: 1px solid; border-radius: 20px; }
-        .product-status.available { border-color: rgba(122,175,144,0.5); color: var(--accent-sage); background: rgba(122,175,144,0.1); }
-        .product-status.unavailable { border-color: rgba(192,97,79,0.4); color: var(--accent-red); background: rgba(192,97,79,0.08); }
-        .product-status::before { content: ""; width: 5px; height: 5px; border-radius: 50%; }
-        .product-status.available::before { background: var(--accent-sage); }
-        .product-status.unavailable::before { background: var(--accent-red); }
-        .add-btn { display: flex; align-items: center; gap: 5px; padding: 5px 12px; background: var(--accent-terra); color: #fff; border: none; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
-        .add-btn:hover { background: var(--accent-terra-dark); }
-        .add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .brand-body { display: none; border-top: 1px solid var(--border-dim); padding: 8px 0; }
+
+        /* Produto em lista */
+        .product-list-header { display: grid; grid-template-columns: 1fr 140px 120px 80px 120px; gap: 8px; padding: 8px 18px; font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-dim); }
+        .product-list-row { display: grid; grid-template-columns: 1fr 140px 120px 80px 120px; gap: 8px; padding: 10px 18px; align-items: center; border-bottom: 1px solid rgba(194,130,102,0.06); transition: background 0.15s; }
+        .product-list-row:last-child { border-bottom: none; }
+        .product-list-row:hover { background: rgba(194,130,102,0.04); }
+        .product-list-row.out { opacity: 0.6; }
+        .pl-name { font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+        .pl-apresentacao { font-size: 12px; color: var(--text-muted); }
+        .pl-dosagem { font-size: 12px; color: var(--text-muted); }
+        .pl-preco { font-family: "Raleway", sans-serif; font-size: 13px; font-weight: 700; color: var(--accent-terra-dark); }
+        .pl-status { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; border: 1px solid; border-radius: 20px; }
+        .pl-status.available { border-color: rgba(122,175,144,0.5); color: var(--accent-sage); background: rgba(122,175,144,0.1); }
+        .pl-status.unavailable { border-color: rgba(192,97,79,0.4); color: var(--accent-red); background: rgba(192,97,79,0.08); }
+        .pl-add-btn { display: flex; align-items: center; gap: 4px; padding: 5px 10px; background: var(--accent-terra); color: #fff; border: none; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+        .pl-add-btn:hover { background: var(--accent-terra-dark); }
+        .pl-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .pl-actions { display: flex; align-items: center; gap: 6px; }
+
+        @media (max-width: 640px) {
+          .product-list-header { grid-template-columns: 1fr 80px 80px; }
+          .product-list-header .hide-mobile { display: none; }
+          .product-list-row { grid-template-columns: 1fr 80px 80px; }
+          .product-list-row .hide-mobile { display: none; }
+        }
+
+        /* Carrinho */
         .cart-overlay { position: fixed; inset: 0; background: rgba(13,15,19,0.4); z-index: 100; backdrop-filter: blur(4px); animation: fadeIn 0.2s ease; }
         .cart-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 420px; max-width: 95vw; background: var(--bg-card); border-left: 1px solid var(--border-main); z-index: 101; display: flex; flex-direction: column; animation: slideRight 0.3s ease; box-shadow: -8px 0 40px rgba(194,130,102,0.15); }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -373,7 +355,7 @@ export default function Home() {
         .results-count { font-size: 12px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 20px; }
         .results-count span { color: var(--accent-terra); font-weight: 700; }
 
-        /* ── Selos + Rodapé ── */
+        /* Selos + Rodapé */
         .selos-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
         @media (max-width: 640px) { .selos-grid { grid-template-columns: repeat(2, 1fr); } }
         .selo-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 12px; background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 12px; text-align: center; }
@@ -386,14 +368,13 @@ export default function Home() {
         .footer-hex span { font-family: "Raleway", sans-serif; font-size: 9px; font-weight: 700; color: #fff; }
         .footer-name { font-family: "Raleway", sans-serif; font-size: 14px; font-weight: 700; color: #9E6650; letter-spacing: 2px; text-transform: uppercase; }
         .footer-copy { font-size: 12px; color: #A8978E; }
-        .footer-cnpj { font-size: 11px; color: #C2B0A8; }
         .footer-links { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 8px; }
         .footer-link { font-size: 11px; color: #B0A090; text-decoration: none; }
         .footer-link:hover { color: #C28266; }
         .footer-sep { color: #D4C4B8; font-size: 10px; }
       `}</style>
 
-      {/* ── Top bar ── */}
+      {/* Top bar */}
       <div className="top-bar">
         <div className="top-logo">
           <div className="logo-hex"><span>PB</span></div>
@@ -416,9 +397,37 @@ export default function Home() {
         <div className="badge red">◈ {totalOut} Em Falta</div>
       </div>
 
+      {/* Busca com autocomplete */}
       <div className="search-wrap">
         <span className="search-icon">⌕</span>
-        <input type="text" className="search-input" placeholder="Buscar produto ou marca..." value={search} onChange={(e) => setSearch(e.target.value)} autoComplete="off" />
+        <input
+          type="text"
+          className="search-input"
+          placeholder="Buscar produto ou marca..."
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setShowSuggestions(true); }}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+          onFocus={() => search.length >= 2 && setShowSuggestions(true)}
+          autoComplete="off"
+        />
+        {showSuggestions && search.length >= 2 && (() => {
+          const suggestions = products
+            .filter((p) => (p.name || "").toLowerCase().includes(search.toLowerCase()))
+            .slice(0, 8);
+          return suggestions.length > 0 ? (
+            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "1px solid rgba(194,130,102,0.25)", borderRadius: 10, boxShadow: "0 8px 24px rgba(194,130,102,0.15)", zIndex: 50, marginTop: 4, overflow: "hidden" }}>
+              {suggestions.map((p) => (
+                <div key={p.id} onMouseDown={() => { setSearch(p.name || ""); setShowSuggestions(false); }}
+                  style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, color: "#0D0F13", borderBottom: "1px solid rgba(194,130,102,0.08)", transition: "background 0.15s" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(194,130,102,0.06)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  {p.name}
+                </div>
+              ))}
+            </div>
+          ) : null;
+        })()}
       </div>
 
       {showBanner && updatesCount > 0 && (
@@ -457,7 +466,7 @@ export default function Home() {
         Exibindo <span>{groups.length}</span> categorias · <span>{products.length}</span> produtos
       </div>
 
-      {/* ── Catálogo ── */}
+      {/* Catálogo */}
       <div id="catalog">
         {loading ? (
           <div className="empty-state">Carregando...</div>
@@ -474,7 +483,7 @@ export default function Home() {
                   <div className="cat-info">
                     <div className="cat-name" dangerouslySetInnerHTML={{ __html: highlight(cat.name) }} />
                     <div className="cat-meta">
-                      <span className="cat-meta-item"><span className="val">{cat.brands.length}</span> marca{cat.brands.length !== 1 ? "s" : ""}</span>
+                      <span className="cat-meta-item"><span className="val">{cat.brands.length}</span> grupo{cat.brands.length !== 1 ? "s" : ""}</span>
                       <span className="cat-meta-sep">·</span>
                       <span className="cat-meta-item"><span className="val">{totalProds}</span> iten{totalProds !== 1 ? "s" : ""}</span>
                       {outProds > 0 && (<><span className="cat-meta-sep">·</span><span className="cat-meta-item"><span className="val out">{outProds} em falta</span></span></>)}
@@ -492,33 +501,44 @@ export default function Home() {
                         <span className="brand-arrow">▼</span>
                       </div>
                       <div className="brand-body">
-                        <div className="product-grid">
-                          {brand.products.map((p) => {
-                            const outOfStock = p.is_out_of_stock || (p.stock ?? 0) <= 0;
-                            return (
-                              <div className={`product-card ${outOfStock ? "out-of-stock" : ""}`} key={p.id}>
-                                <div className="product-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
-                                <div className="product-brand-label" dangerouslySetInnerHTML={{ __html: highlight(brand.name) }} />
-                                {p.price && (
-                                  <div className="product-price">
-                                    R$ {Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                                  </div>
-                                )}
-                                <div className="product-footer">
-                                  <span className={`product-status ${outOfStock ? "unavailable" : "available"}`}>
-                                    {outOfStock ? "Em Falta" : "Disponível"}
-                                  </span>
-                                  {!outOfStock && (
-                                    <button className="add-btn" onClick={() => addToCart(p)} disabled={addingId === p.id}>
-                                      <Plus size={13} />
-                                      {addingId === p.id ? "..." : "Adicionar"}
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
+                        {/* Cabeçalho da lista */}
+                        <div className="product-list-header">
+                          <span>Produto</span>
+                          <span>Apresentação</span>
+                          <span>Dosagem</span>
+                          <span>Preço</span>
+                          <span>Estoque</span>
                         </div>
+                        {/* Linhas de produtos */}
+                        {brand.products.map((p) => {
+                          const outOfStock = p.is_out_of_stock || (p.stock ?? 0) <= 0;
+                          const descParts = (p.description || "").split(" ");
+                          const apresentacao = descParts.slice(0, -1).join(" ") || p.description || "—";
+                          const dosagem = descParts[descParts.length - 1] || "—";
+                          return (
+                            <div className={`product-list-row ${outOfStock ? "out" : ""}`} key={p.id}>
+                              <div className="pl-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
+                              <div className="pl-apresentacao hide-mobile">{apresentacao}</div>
+                              <div className="pl-dosagem hide-mobile">{dosagem}</div>
+                              <div className="pl-preco">
+                                {p.price ? `R$ ${Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                              </div>
+                              <div className="pl-actions">
+                                {outOfStock ? (
+                                  <span className="pl-status unavailable">Em Falta</span>
+                                ) : (
+                                  <>
+                                    <span className="pl-status available">{p.stock} un.</span>
+                                    <button className="pl-add-btn" onClick={() => addToCart(p)} disabled={addingId === p.id}>
+                                      <Plus size={11} />
+                                      {addingId === p.id ? "..." : "Add"}
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -529,7 +549,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* ── Selos de segurança + Rodapé ── */}
+      {/* Selos + Rodapé */}
       <div style={{ marginTop: 48, borderTop: "1px solid rgba(194,130,102,0.15)", paddingTop: 32 }}>
         <div className="selos-grid">
           {[
@@ -545,7 +565,6 @@ export default function Home() {
             </div>
           ))}
         </div>
-
         <div className="footer-wrap">
           <div className="footer-logo">
             <div className="footer-hex"><span>PB</span></div>
@@ -553,11 +572,16 @@ export default function Home() {
           </div>
           <p className="footer-copy">© {new Date().getFullYear()} PB Imports — Todos os direitos reservados.</p>
           <div className="footer-links">
+            <Link href="/fretes" className="footer-link">Tabela de Fretes</Link>
+            <span className="footer-sep">·</span>
+            <Link href="/regras" className="footer-link">Regras de Envio</Link>
+            <span className="footer-sep">·</span>
+            <Link href="/curiosidades" className="footer-link">Curiosidades</Link>
           </div>
         </div>
       </div>
 
-      {/* ── Drawer do carrinho ── */}
+      {/* Drawer do carrinho */}
       {cartOpen && (
         <>
           <div className="cart-overlay" onClick={() => setCartOpen(false)} />
@@ -599,22 +623,7 @@ export default function Home() {
             </div>
             {cartItems.length > 0 && (
               <div className="cart-foot">
-                <button
-                  onClick={() => setCartOpen(false)}
-                  style={{
-                    width: "100%",
-                    padding: "10px",
-                    background: "transparent",
-                    border: "1.5px solid rgba(194,130,102,0.3)",
-                    borderRadius: 8,
-                    color: "#C28266",
-                    fontFamily: "Raleway, sans-serif",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    marginBottom: 12,
-                  }}
-                >
+                <button onClick={() => setCartOpen(false)} style={{ width: "100%", padding: "10px", background: "transparent", border: "1.5px solid rgba(194,130,102,0.3)", borderRadius: 8, color: "#C28266", fontFamily: "Raleway, sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12 }}>
                   ← Continuar comprando
                 </button>
                 <div className="cart-subtotal">
