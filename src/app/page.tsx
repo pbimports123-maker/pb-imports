@@ -207,7 +207,7 @@ export default function Home() {
         );
       });
       const isEmagrecedores = (cat.name || "").toLowerCase() === "emagrecedores";
-      const PRINCIPIOS = ["Tirzepatida", "Retatrutida", "Retatrutide", "Semaglutida"];
+      const PRINCIPIOS = ["Tirzepatida", "Retatrutida", "Semaglutida"];
       const brandsMap = new Map<string, Product[]>();
       filtered.forEach((p) => {
         let key: string;
@@ -222,7 +222,11 @@ export default function Home() {
             const found = PRINCIPIOS.find((pa) =>
               (p.name || "").toLowerCase().includes(pa.toLowerCase())
             );
-            key = found || "Outros";
+            if (!found && (p.name || "").toLowerCase().includes("retatrutide")) {
+              key = "Retatrutida";
+            } else {
+              key = found || "Outros";
+            }
           }
         } else {
           key = p.brand || "Outros";
