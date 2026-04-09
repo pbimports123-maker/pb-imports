@@ -206,10 +206,20 @@ export default function Home() {
           (cat.name || "").toLowerCase().includes(s)
         );
       });
+      const isEmagrecedores = (cat.name || "").toLowerCase() === "emagrecedores";
+      const PRINCIPIOS = ["Tirzepatida", "Retatrutida", "Semaglutida"];
       const brandsMap = new Map<string, Product[]>();
       filtered.forEach((p) => {
-        const b = p.brand || "Outros";
-        brandsMap.set(b, [...(brandsMap.get(b) || []), p]);
+        let key: string;
+        if (isEmagrecedores) {
+          const found = PRINCIPIOS.find((pa) =>
+            (p.name || "").toLowerCase().includes(pa.toLowerCase())
+          );
+          key = found || "Outros";
+        } else {
+          key = p.brand || "Outros";
+        }
+        brandsMap.set(key, [...(brandsMap.get(key) || []), p]);
       });
       const brands: BrandGroup[] = Array.from(brandsMap.entries()).map(([name, products]) => ({ name, products }));
       return { id: cat.id, name: cat.name || "Sem Categoria", abbr: (cat.name || "??").slice(0, 2).toUpperCase(), brands };
