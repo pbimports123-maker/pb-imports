@@ -1505,28 +1505,22 @@ export default function Home() {
                                 style={{ flex: 1, minWidth: 0 }}
                               >
                                 <div
+                                  className="pc-name"
+                                  dangerouslySetInnerHTML={{
+                                    __html: highlight(p.name),
+                                  }}
+                                />
+                                <div
                                   style={{
                                     display: "flex",
-                                    alignItems: "flex-start",
+                                    alignItems: "center",
                                     justifyContent: "space-between",
-                                    gap: "8px",
+                                    marginTop: 4,
                                   }}
                                 >
-                                  <div
-                                    className="pc-name"
-                                    style={{
-                                      flex: 1,
-                                      minWidth: 0,
-                                      display: "-webkit-box",
-                                      WebkitLineClamp: 2,
-                                      WebkitBoxOrient: "vertical",
-                                      overflow: "hidden",
-                                      whiteSpace: "normal",
-                                    }}
-                                    dangerouslySetInnerHTML={{
-                                      __html: highlight(p.name),
-                                    }}
-                                  />
+                                  <div className="pc-brand">
+                                    {(p as any).dosage || ""}
+                                  </div>
                                   <div style={{ flexShrink: 0 }}>
                                     {outOfStock ? (
                                       <span className="pc-status unavailable">
@@ -1558,12 +1552,9 @@ export default function Home() {
                                 </div>
                                 <div
                                   className="pc-brand"
-                                  style={{ marginTop: 4 }}
+                                  style={{ marginTop: 2 }}
                                 >
                                   {(p as any).presentation || ""}
-                                  {(p as any).dosage
-                                    ? ` · ${(p as any).dosage}`
-                                    : ""}
                                 </div>
                               </div>
                             </div>
