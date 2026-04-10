@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
@@ -351,7 +351,7 @@ export default function Home() {
         .results-count { font-size: 12px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 20px; }
         .results-count span { color: var(--accent-terra); font-weight: 700; }
 
-        /* Selos + Rodapé */
+        /* Selos + RodapÃ© */
         .selos-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
         @media (max-width: 640px) { .selos-grid { grid-template-columns: repeat(2, 1fr); } }
         .selo-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 12px; background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 12px; text-align: center; }
@@ -389,13 +389,13 @@ export default function Home() {
       <div className="page-title">Lista de <span>Disponibilidade</span></div>
 
       <div className="badges">
-        <div className="badge green">⬡ {totalAvailable} Disponíveis</div>
-        <div className="badge red">◈ {totalOut} Em Falta</div>
+        <div className="badge green">â¬¡ {totalAvailable} DisponÃ­veis</div>
+        <div className="badge red">â—ˆ {totalOut} Em Falta</div>
       </div>
 
       {/* Busca com autocomplete */}
       <div className="search-wrap">
-        <span className="search-icon">⌕</span>
+        <span className="search-icon">âŒ•</span>
         <input
           type="text"
           className="search-input"
@@ -408,41 +408,41 @@ export default function Home() {
 
       {showBanner && updatesCount > 0 && (
         <div className="notif-banner">
-          <div className="notif-icon">🔔</div>
+          <div className="notif-icon">ðŸ””</div>
           <div className="notif-text">
-            <strong>{updatesCount} {updatesCount === 1 ? "atualização" : "atualizações"} desde sua última visita</strong>
+            <strong>{updatesCount} {updatesCount === 1 ? "atualizaÃ§Ã£o" : "atualizaÃ§Ãµes"} desde sua Ãºltima visita</strong>
             <span>{updatesCount === 1 ? "1 produto foi atualizado" : `${updatesCount} produtos foram atualizados`}</span>
           </div>
-          <span className="notif-close" onClick={handleCloseBanner}>✕</span>
+          <span className="notif-close" onClick={handleCloseBanner}>âœ•</span>
         </div>
       )}
 
       <div className="quick-links">
         <Link href="/fretes" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit", minWidth: 0 }}>
-          <div className="quick-banner-icon">🚚</div>
+          <div className="quick-banner-icon">ðŸšš</div>
           <div className="quick-banner-text"><strong>Tabela de Fretes</strong><span>Valores de entrega</span></div>
         </Link>
         <Link href="/regras" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit", minWidth: 0 }}>
-          <div className="quick-banner-icon">📋</div>
+          <div className="quick-banner-icon">ðŸ“‹</div>
           <div className="quick-banner-text"><strong>Regras de Envio</strong><span>Como funciona</span></div>
         </Link>
       </div>
 
       <Link href="/curiosidades" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit", marginBottom: "12px" }}>
-        <div className="quick-banner-icon">💡</div>
-        <div className="quick-banner-text"><strong>Curiosidades</strong><span>Dicas e fatos rápidos</span></div>
+        <div className="quick-banner-icon">ðŸ’¡</div>
+        <div className="quick-banner-text"><strong>Curiosidades</strong><span>Dicas e fatos rÃ¡pidos</span></div>
       </Link>
 
       <div className="info-strip">
-        <span className="i-icon">💡</span>
-        <span>Esta lista mostra <span className="cyan">todos os produtos</span> da PB Imports. Produtos <span className="red">em falta</span> serão repostos em breve.</span>
+        <span className="i-icon">ðŸ’¡</span>
+        <span>Esta lista mostra <span className="cyan">todos os produtos</span> da PB Imports. Produtos <span className="red">em falta</span> serÃ£o repostos em breve.</span>
       </div>
 
       <div className="results-count">
-        Exibindo <span>{groups.length}</span> categorias · <span>{products.length}</span> produtos
+        Exibindo <span>{groups.length}</span> categorias Â· <span>{products.length}</span> produtos
       </div>
 
-      {/* Catálogo */}
+      {/* CatÃ¡logo */}
       <div id="catalog">
         {loading ? (
           <div className="empty-state">Carregando...</div>
@@ -460,12 +460,12 @@ export default function Home() {
                     <div className="cat-name" dangerouslySetInnerHTML={{ __html: highlight(cat.name) }} />
                     <div className="cat-meta">
                       <span className="cat-meta-item"><span className="val">{cat.brands.length}</span> grupo{cat.brands.length !== 1 ? "s" : ""}</span>
-                      <span className="cat-meta-sep">·</span>
+                      <span className="cat-meta-sep">Â·</span>
                       <span className="cat-meta-item"><span className="val">{totalProds}</span> iten{totalProds !== 1 ? "s" : ""}</span>
-                      {outProds > 0 && (<><span className="cat-meta-sep">·</span><span className="cat-meta-item"><span className="val out">{outProds} em falta</span></span></>)}
+                      {outProds > 0 && (<><span className="cat-meta-sep">Â·</span><span className="cat-meta-item"><span className="val out">{outProds} em falta</span></span></>)}
                     </div>
                   </div>
-                  <span className="cat-arrow">▼</span>
+                  <span className="cat-arrow">â–¼</span>
                 </div>
                 <div className="cat-body">
                   {cat.brands.map((brand, bi) => (
@@ -474,39 +474,37 @@ export default function Home() {
                         <div className="brand-dot"></div>
                         <span className="brand-name" dangerouslySetInnerHTML={{ __html: highlight(brand.name) }} />
                         <span className="brand-count">{brand.products.length} produto{brand.products.length !== 1 ? "s" : ""}</span>
-                        <span className="brand-arrow">▼</span>
+                        <span className="brand-arrow">â–¼</span>
                       </div>
                       <div className="brand-body" style={{ padding: "12px 16px 14px" }}>
                         {brand.products.map((p) => {
                           const outOfStock = p.is_out_of_stock || (p.stock ?? 0) <= 0;
                           return (
                             <div className={`product-card-row ${outOfStock ? "out" : ""}`} key={p.id}>
-                              {(p as any).image_url ? (
-                                <img src={(p as any).image_url} alt={p.name} className="pc-img" />
-                              ) : (
-                                <div className="pc-placeholder">{(p.name || "").slice(0, 2).toUpperCase()}</div>
-                              )}
-                              <div className="pc-info" style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
-                                    <div className="pc-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
-                                  {outOfStock ? (
-                                    <span className="pc-status unavailable" style={{ flexShrink: 0 }}>Indisponível</span>
-                                  ) : (
-                                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                                      <div className="pc-price">
-                                        {p.price ? `R$ ${Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
-                                      </div>
-                                      <button className="pc-add-btn" onClick={() => addToCart(p)} disabled={addingId === p.id}>
-                                        <ShoppingCart size={14} />
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                                {(cat.name || "").toLowerCase() !== "emagrecedores" && (
-                                  <div className="pc-brand">{(p as any).presentation || ""} {(p as any).dosage || ""}</div>
-                                )}
-                              </div>
-                            </div>
+  {(p as any).image_url ? (
+    <img src={(p as any).image_url} alt={p.name} className="pc-img" />
+  ) : (
+    <div className="pc-placeholder">{(p.name || "").slice(0, 2).toUpperCase()}</div>
+  )}
+  <div className="pc-info" style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+      <div className="pc-name" style={{ flex: 1, minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "normal" }} dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
+      <div style={{ flexShrink: 0 }}>
+        {outOfStock ? (
+          <span className="pc-status unavailable">Indisponível</span>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div className="pc-price">{p.price ? `R$ ${Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}</div>
+            <button className="pc-add-btn" onClick={() => addToCart(p)} disabled={addingId === p.id}>
+              <ShoppingCart size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+    <div className="pc-brand" style={{ marginTop: 4 }}>{(p as any).presentation || ""}{(p as any).dosage ? ` · ${(p as any).dosage}` : ""}</div>
+  </div>
+</div>
                           );
                         })}
                       </div>
@@ -519,14 +517,14 @@ export default function Home() {
         )}
       </div>
 
-      {/* Selos + Rodapé */}
+      {/* Selos + RodapÃ© */}
       <div style={{ marginTop: 48, borderTop: "1px solid rgba(194,130,102,0.15)", paddingTop: 32 }}>
         <div className="selos-grid">
           {[
-            { icon: "🔒", title: "SSL Certificado", desc: "Conexão segura e criptografada" },
-            { icon: "💳", title: "Pagamento via Pix", desc: "Aprovação imediata e segura" },
-            { icon: "🛡️", title: "Dados Protegidos", desc: "Sua privacidade é prioridade" },
-            { icon: "✅", title: "Compra Segura", desc: "Satisfação garantida" },
+            { icon: "ðŸ”’", title: "SSL Certificado", desc: "ConexÃ£o segura e criptografada" },
+            { icon: "ðŸ’³", title: "Pagamento via Pix", desc: "AprovaÃ§Ã£o imediata e segura" },
+            { icon: "ðŸ›¡ï¸", title: "Dados Protegidos", desc: "Sua privacidade Ã© prioridade" },
+            { icon: "âœ…", title: "Compra Segura", desc: "SatisfaÃ§Ã£o garantida" },
           ].map((selo, i) => (
             <div className="selo-card" key={i}>
               <span className="selo-icon">{selo.icon}</span>
@@ -540,12 +538,12 @@ export default function Home() {
             <div className="footer-hex"><span>PB</span></div>
             <span className="footer-name">PB Imports</span>
           </div>
-          <p className="footer-copy">© {new Date().getFullYear()} PB Imports — Todos os direitos reservados.</p>
+          <p className="footer-copy">Â© {new Date().getFullYear()} PB Imports â€” Todos os direitos reservados.</p>
           <div className="footer-links">
             <Link href="/fretes" className="footer-link">Tabela de Fretes</Link>
-            <span className="footer-sep">·</span>
+            <span className="footer-sep">Â·</span>
             <Link href="/regras" className="footer-link">Regras de Envio</Link>
-            <span className="footer-sep">·</span>
+            <span className="footer-sep">Â·</span>
             <Link href="/curiosidades" className="footer-link">Curiosidades</Link>
           </div>
         </div>
@@ -557,15 +555,15 @@ export default function Home() {
           <div className="cart-overlay" onClick={() => setCartOpen(false)} />
           <div className="cart-drawer">
             <div className="cart-head">
-              <h2>🛒 Meu Carrinho {cartCount > 0 && `(${cartCount})`}</h2>
+              <h2>ðŸ›’ Meu Carrinho {cartCount > 0 && `(${cartCount})`}</h2>
               <button className="cart-close" onClick={() => setCartOpen(false)}><X size={16} /></button>
             </div>
             <div className="cart-body">
               {cartItems.length === 0 ? (
                 <div className="cart-empty">
-                  <p style={{ fontSize: 32, marginBottom: 12 }}>🛍️</p>
-                  <p>Seu carrinho está vazio</p>
-                  <p style={{ fontSize: 12, marginTop: 6, color: "var(--text-dim)" }}>Adicione produtos do catálogo</p>
+                  <p style={{ fontSize: 32, marginBottom: 12 }}>ðŸ›ï¸</p>
+                  <p>Seu carrinho estÃ¡ vazio</p>
+                  <p style={{ fontSize: 12, marginTop: 6, color: "var(--text-dim)" }}>Adicione produtos do catÃ¡logo</p>
                 </div>
               ) : (
                 cartItems.map((item) => (
@@ -594,14 +592,14 @@ export default function Home() {
             {cartItems.length > 0 && (
               <div className="cart-foot">
                 <button onClick={() => setCartOpen(false)} style={{ width: "100%", padding: "10px", background: "transparent", border: "1.5px solid rgba(194,130,102,0.3)", borderRadius: 8, color: "#C28266", fontFamily: "Raleway, sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12 }}>
-                  ← Continuar comprando
+                  â† Continuar comprando
                 </button>
                 <div className="cart-subtotal">
                   <span>Subtotal dos produtos</span>
                   <strong>R$ {cartTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
                 </div>
                 <Link href="/checkout" style={{ textDecoration: "none" }}>
-                  <button className="checkout-btn" onClick={() => setCartOpen(false)}>Finalizar Pedido →</button>
+                  <button className="checkout-btn" onClick={() => setCartOpen(false)}>Finalizar Pedido â†’</button>
                 </Link>
               </div>
             )}
@@ -611,3 +609,4 @@ export default function Home() {
     </div>
   );
 }
+
