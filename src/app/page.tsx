@@ -473,6 +473,7 @@ export default function Home() {
           text-transform: uppercase;
           border: 1px solid;
           border-radius: 8px;
+          white-space: nowrap;
         }
         .badge.green {
           border-color: var(--accent-sage);
