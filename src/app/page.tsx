@@ -43,7 +43,6 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [openCat, setOpenCat] = useState<string | null>(null);
   const [showBanner, setShowBanner] = useState(false);
   const [updatesCount, setUpdatesCount] = useState(0);
@@ -404,29 +403,9 @@ export default function Home() {
           className="search-input"
           placeholder="Buscar produto ou marca..."
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setShowSuggestions(true); }}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-          onFocus={() => search.length >= 2 && setShowSuggestions(true)}
+          onChange={(e) => setSearch(e.target.value)}
           autoComplete="off"
         />
-        {showSuggestions && search.length >= 2 && (() => {
-          const suggestions = products
-            .filter((p) => (p.name || "").toLowerCase().includes(search.toLowerCase()))
-            .slice(0, 8);
-          return suggestions.length > 0 ? (
-            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "1px solid rgba(194,130,102,0.25)", borderRadius: 10, boxShadow: "0 8px 24px rgba(194,130,102,0.15)", zIndex: 50, marginTop: 4, overflow: "hidden" }}>
-              {suggestions.map((p) => (
-                <div key={p.id} onMouseDown={() => { setSearch(p.name || ""); setShowSuggestions(false); }}
-                  style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, color: "#0D0F13", borderBottom: "1px solid rgba(194,130,102,0.08)", transition: "background 0.15s" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(194,130,102,0.06)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  {p.name}
-                </div>
-              ))}
-            </div>
-          ) : null;
-        })()}
       </div>
 
       {showBanner && updatesCount > 0 && (
@@ -528,8 +507,9 @@ export default function Home() {
                                     </div>
                                   )}
                                 </div>
-                                <div className="pc-apresentacao">{(p as any).presentation || "—"}</div>
-                                <div className="pc-dosagem">{(p as any).dosage || "—"}</div>
+                                {(cat.name || "").toLowerCase() !== "emagrecedores" && (
+                                  <div className="pc-brand">{(p as any).presentation || ""} {(p as any).dosage || ""}</div>
+                                )}
                               </div>
                             </div>
                           );
