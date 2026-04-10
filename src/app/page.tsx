@@ -481,9 +481,6 @@ export default function Home() {
                       <div className="brand-body" style={{ padding: "12px 16px 14px" }}>
                         {brand.products.map((p) => {
                           const outOfStock = p.is_out_of_stock || (p.stock ?? 0) <= 0;
-                          const descParts = (p.description || "").split(" ");
-                          const apresentacao = descParts.slice(0, -1).join(" ") || "—";
-                          const dosagem = descParts[descParts.length - 1] || "—";
                           return (
                             <div className={`product-card-row ${outOfStock ? "out" : ""}`} key={p.id}>
                               {(p as any).image_url ? (
