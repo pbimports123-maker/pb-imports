@@ -1246,17 +1246,8 @@ export default function Home() {
         </button>
       </div>
 
-      <div style={{ textAlign: "center", margin: "0 0 24px" }}>
-        <img
-          src="/deixe_essa.png"
-          alt="PB Imports"
-          style={{
-            width: "100%",
-            maxWidth: "600px",
-            display: "block",
-            margin: "0 auto",
-          }}
-        />
+      <div className="page-title">
+        Lista de <span>Disponibilidade</span>
       </div>
 
       <div className="badges">
