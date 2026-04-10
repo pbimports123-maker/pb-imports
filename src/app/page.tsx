@@ -309,9 +309,6 @@ export default function Home() {
         .pc-info { flex: 1; min-width: 0; }
         .pc-name { font-size: 14px; font-weight: 700; color: var(--text-primary); line-height: 1.3; margin-bottom: 2px; }
         .pc-brand { font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px; }
-        .pc-meta { display: flex; align-items: center; gap: 16px; }
-        .pc-apresentacao { font-size: 12px; color: var(--text-muted); }
-        .pc-dosagem { font-size: 12px; color: var(--text-muted); }
         .pc-price { font-family: "Raleway", sans-serif; font-size: 16px; font-weight: 700; color: var(--accent-terra-dark); white-space: nowrap; }
         .pc-status { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; border: 1px solid; border-radius: 20px; white-space: nowrap; }
         .pc-status.available { border-color: rgba(122,175,144,0.5); color: var(--accent-sage); background: rgba(122,175,144,0.1); }
