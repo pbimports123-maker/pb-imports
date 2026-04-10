@@ -1686,19 +1686,6 @@ export default function Home() {
             © {new Date().getFullYear()} PB Imports — Todos os direitos
             reservados.
           </p>
-          <div className="footer-links">
-            <Link href="/fretes" className="footer-link">
-              Tabela de Fretes
-            </Link>
-            <span className="footer-sep">·</span>
-            <Link href="/regras" className="footer-link">
-              Regras de Envio
-            </Link>
-            <span className="footer-sep">·</span>
-            <Link href="/curiosidades" className="footer-link">
-              Curiosidades
-            </Link>
-          </div>
         </div>
       </div>
 
