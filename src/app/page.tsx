@@ -1246,8 +1246,98 @@ export default function Home() {
         </button>
       </div>
 
-      <div className="page-title">
-        Lista de <span>Disponibilidade</span>
+      <div
+        style={{
+          textAlign: "center",
+          padding: "32px 0 24px",
+          background:
+            "radial-gradient(ellipse at center, rgba(180,230,220,0.3) 0%, rgba(210,200,170,0.2) 50%, transparent 70%)",
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "Raleway, sans-serif",
+            fontSize: "clamp(36px, 8vw, 72px)",
+            fontWeight: 900,
+            letterSpacing: "4px",
+            textTransform: "uppercase",
+            background:
+              "linear-gradient(135deg, #B8D4C8 0%, #7ABFB0 25%, #D4C484 50%, #7ABFB0 75%, #B8D4C8 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+            textShadow: "none",
+            lineHeight: 1.1,
+          }}
+        >
+          PB IMPORTS
+        </div>
+        <div
+          style={{
+            fontSize: "clamp(13px, 2.5vw, 18px)",
+            color: "#5A6B65",
+            letterSpacing: "2px",
+            margin: "8px 0 12px",
+            fontFamily: "Raleway, sans-serif",
+          }}
+        >
+          Compostos premium. Fonte confiável.
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "12px",
+            margin: "0 0 10px",
+          }}
+        >
+          <div
+            style={{
+              height: "1px",
+              width: "60px",
+              background: "linear-gradient(to right, transparent, #7ABFB0)",
+            }}
+          ></div>
+          <span
+            style={{
+              fontSize: "12px",
+              color: "#8A9B95",
+              letterSpacing: "3px",
+              textTransform: "uppercase",
+            }}
+          >
+            Distribuição
+          </span>
+          <div
+            style={{
+              height: "1px",
+              width: "60px",
+              background: "linear-gradient(to left, transparent, #7ABFB0)",
+            }}
+          ></div>
+        </div>
+        <div
+          style={{
+            fontFamily: "Raleway, sans-serif",
+            fontSize: "clamp(18px, 4vw, 28px)",
+            fontWeight: 700,
+            color: "#4A8B80",
+            letterSpacing: "3px",
+          }}
+        >
+          ZPHCD™
+        </div>
+        <div
+          style={{
+            fontSize: "clamp(11px, 2vw, 14px)",
+            color: "#8A9B95",
+            marginTop: "10px",
+            letterSpacing: "1px",
+          }}
+        >
+          Produtos selecionados de fornecedores premium.
+        </div>
       </div>
 
       <div className="badges">
