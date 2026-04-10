@@ -36,25 +36,6 @@ function saveLastVisit(): void {
   localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
 }
 
-const PRINCIPIOS_ATIVOS = ["Tirzepatida", "Retatrutida", "Semaglutida"];
-const TIRZEPATIDA_MARCAS = [
-  "lipoland",
-  "lipoless",
-  "mounjaro",
-  "t.g",
-  "tirzec",
-];
-
-function getEmagrecedorGroup(productName: string): string {
-  const lower = (productName || "").toLowerCase();
-  if (TIRZEPATIDA_MARCAS.some((m) => lower.includes(m))) return "Tirzepatida";
-  const found = PRINCIPIOS_ATIVOS.find((pa) =>
-    lower.includes(pa.toLowerCase()),
-  );
-  if (!found && lower.includes("retatrutide")) return "Retatrutida";
-  return found || "Outros";
-}
-
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -254,8 +235,6 @@ export default function Home() {
 
   const groups: CategoryGroup[] = useMemo(() => {
     const normalized = categories.map((cat) => {
-      const isEmagrecedores =
-        (cat.name || "").toLowerCase() === "emagrecedores";
       const catProducts = products.filter((p) => p.category_id === cat.id);
       const filtered = catProducts.filter((p) => {
         if (!search) return true;
@@ -269,9 +248,7 @@ export default function Home() {
 
       const groupMap = new Map<string, Product[]>();
       filtered.forEach((p) => {
-        const key = isEmagrecedores
-          ? getEmagrecedorGroup(p.name || "")
-          : p.brand || "Outros";
+        const key = p.brand || "Outros";
         groupMap.set(key, [...(groupMap.get(key) || []), p]);
       });
 
