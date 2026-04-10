@@ -195,7 +195,7 @@ export default function CuriosidadesPage() {
         ) : filtered.length === 0 ? (
           <div style={{ textAlign:"center", padding:"60px 0", color:"#A8978E", fontSize:14 }}>Nenhuma curiosidade encontrada.</div>
         ) : (
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:16 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:16, gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 500px), 1fr))" }}>
             {filtered.map((item, idx) => {
               const isPeptide = item.tag === "Peptídeo" && maybeParsePeptide(item.content).length >= 3;
               const peptideRows = isPeptide ? maybeParsePeptide(item.content) : [];
