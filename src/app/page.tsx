@@ -44,6 +44,7 @@ export default function Home() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [openCat, setOpenCat] = useState<string | null>(null);
   const [showBanner, setShowBanner] = useState(false);
   const [updatesCount, setUpdatesCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -475,8 +476,8 @@ export default function Home() {
             const totalProds = cat.brands.reduce((a, b) => a + b.products.length, 0);
             const outProds = cat.brands.reduce((a, b) => a + b.products.filter((p) => p.is_out_of_stock || (p.stock ?? 0) <= 0).length, 0);
             return (
-              <div className={`cat-block`} key={cat.id} style={{ animationDelay: `${ci * 0.07}s` }}>
-                <div className="cat-header" onClick={(e) => { (e.currentTarget.parentElement as HTMLElement)?.classList.toggle("open"); }}>
+              <div className={`cat-block ${openCat === cat.id ? "open" : ""}`} key={cat.id} style={{ animationDelay: `${ci * 0.07}s` }}>
+                <div className="cat-header" onClick={() => setOpenCat(openCat === cat.id ? null : cat.id)}>
                   <div className="cat-icon">{cat.abbr}</div>
                   <div className="cat-info">
                     <div className="cat-name" dangerouslySetInnerHTML={{ __html: highlight(cat.name) }} />
@@ -511,26 +512,25 @@ export default function Home() {
                               ) : (
                                 <div className="pc-placeholder">{(p.name || "").slice(0, 2).toUpperCase()}</div>
                               )}
-                              <div className="pc-info">
-                                <div className="pc-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
-                                <div className="pc-brand">{p.brand}</div>
+                              <div className="pc-info" style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+                                  <div className="pc-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
+                                  {outOfStock ? (
+                                    <span className="pc-status unavailable" style={{ flexShrink: 0 }}>Indisponível</span>
+                                  ) : (
+                                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                                      <div className="pc-price">
+                                        {p.price ? `R$ ${Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                                      </div>
+                                      <button className="pc-add-btn" onClick={() => addToCart(p)} disabled={addingId === p.id}>
+                                        <ShoppingCart size={14} />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="pc-apresentacao">{(p as any).presentation || "—"}</div>
+                                <div className="pc-dosagem">{(p as any).dosage || "—"}</div>
                               </div>
-                              <div className="pc-meta">
-                                <span className="pc-apresentacao">{apresentacao}</span>
-                                <span className="pc-dosagem">{dosagem}</span>
-                              </div>
-                              <div className="pc-price">
-                                {p.price ? `R$ ${Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
-                              </div>
-                              <span className={`pc-status ${outOfStock ? "unavailable" : "available"}`}>
-                                {outOfStock ? "Em Falta" : "Disponível"}
-                              </span>
-                              {!outOfStock && (
-                                <button className="pc-add-btn" onClick={() => addToCart(p)} disabled={addingId === p.id}>
-                                  <ShoppingCart size={14} />
-                                  {addingId === p.id ? "..." : "Adicionar"}
-                                </button>
-                              )}
                             </div>
                           );
                         })}
