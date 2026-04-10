@@ -229,7 +229,7 @@ export default function CuriosidadesPage() {
                     {isPeptide ? (
                       <div>
                         {/* Tabela de peptídeos */}
-                        <div style={{ display:"grid", gridTemplateColumns:"160px 1fr 1fr", gap:12, paddingBottom:8, marginBottom:8, borderBottom:"1px solid rgba(194,130,102,0.1)" }}>
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, paddingBottom:8, marginBottom:8, borderBottom:"1px solid rgba(194,130,102,0.1)" }}>
                           <span style={{ fontSize:10, color:"#A8978E", letterSpacing:2, textTransform:"uppercase" }}>Peptídeo</span>
                           <span style={{ fontSize:10, color:"#A8978E", letterSpacing:2, textTransform:"uppercase", display:"flex", alignItems:"center", gap:6 }}>
                             <span style={{ width:5, height:5, borderRadius:"50%", background:"#D4A96A", boxShadow:"0 0 6px #D4A96A", display:"inline-block" }} />Clínico
@@ -239,7 +239,7 @@ export default function CuriosidadesPage() {
                           </span>
                         </div>
                         {peptideRows.map((row, rIdx) => (
-                          <div key={rIdx} style={{ display:"grid", gridTemplateColumns:"160px 1fr 1fr", gap:12, padding:"8px 0", borderBottom:"1px solid rgba(194,130,102,0.06)", alignItems:"center" }}>
+                          <div key={rIdx} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, padding:"8px 0", borderBottom:"1px solid rgba(194,130,102,0.06)", alignItems:"center" }}>
                             <span style={{ fontFamily:"DM Sans", fontSize:12, color:"#C28266", fontWeight:600 }}>{row.name}</span>
                             <span style={{ fontSize:12, color:"#7A6558", display:"flex", alignItems:"center", gap:6 }}>
                               <span style={{ width:5, height:5, borderRadius:"50%", background:"#D4A96A", display:"inline-block", flexShrink:0 }} />{row.clinical}
