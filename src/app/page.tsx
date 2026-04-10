@@ -43,7 +43,7 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [openCat, setOpenCat] = useState<string | null>(null);
   const [showBanner, setShowBanner] = useState(false);
   const [updatesCount, setUpdatesCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -259,8 +259,9 @@ export default function Home() {
         .notif-text strong { display: block; font-size: 15px; font-weight: 600; color: var(--text-primary); }
         .notif-text span { font-size: 12px; color: var(--text-muted); }
         .notif-close { margin-left: auto; color: var(--text-dim); font-size: 18px; cursor: pointer; padding: 4px; }
-        .quick-links { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-        .quick-banner-icon { width: 36px; height: 36px; background: rgba(194,130,102,0.1); border: 1px solid var(--border-main); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+        .quick-links { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px; }
+        .quick-banner-icon { width: 32px; height: 32px; background: rgba(194,130,102,0.1); border: 1px solid var(--border-main); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+        @media (max-width: 480px) { .quick-banner-icon { width: 28px; height: 28px; font-size: 13px; } }
         .quick-banner-text strong { display: block; font-size: 15px; font-weight: 600; color: var(--text-primary); }
         .quick-banner-text span { font-size: 12px; color: var(--text-muted); }
         .info-strip { display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px; background: var(--bg-card2); border: 1px solid var(--border-dim); border-left: 3px solid var(--accent-terra); border-radius: 0 8px 8px 0; margin-bottom: 28px; font-size: 14px; line-height: 1.6; animation: slideIn 0.5s ease 0.2s both; }
@@ -308,9 +309,6 @@ export default function Home() {
         .pc-info { flex: 1; min-width: 0; }
         .pc-name { font-size: 14px; font-weight: 700; color: var(--text-primary); line-height: 1.3; margin-bottom: 2px; }
         .pc-brand { font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px; }
-        .pc-meta { display: flex; align-items: center; gap: 16px; }
-        .pc-apresentacao { font-size: 12px; color: var(--text-muted); }
-        .pc-dosagem { font-size: 12px; color: var(--text-muted); }
         .pc-price { font-family: "Raleway", sans-serif; font-size: 16px; font-weight: 700; color: var(--accent-terra-dark); white-space: nowrap; }
         .pc-status { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; border: 1px solid; border-radius: 20px; white-space: nowrap; }
         .pc-status.available { border-color: rgba(122,175,144,0.5); color: var(--accent-sage); background: rgba(122,175,144,0.1); }
@@ -402,29 +400,9 @@ export default function Home() {
           className="search-input"
           placeholder="Buscar produto ou marca..."
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setShowSuggestions(true); }}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-          onFocus={() => search.length >= 2 && setShowSuggestions(true)}
+          onChange={(e) => setSearch(e.target.value)}
           autoComplete="off"
         />
-        {showSuggestions && search.length >= 2 && (() => {
-          const suggestions = products
-            .filter((p) => (p.name || "").toLowerCase().includes(search.toLowerCase()))
-            .slice(0, 8);
-          return suggestions.length > 0 ? (
-            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "1px solid rgba(194,130,102,0.25)", borderRadius: 10, boxShadow: "0 8px 24px rgba(194,130,102,0.15)", zIndex: 50, marginTop: 4, overflow: "hidden" }}>
-              {suggestions.map((p) => (
-                <div key={p.id} onMouseDown={() => { setSearch(p.name || ""); setShowSuggestions(false); }}
-                  style={{ padding: "10px 16px", cursor: "pointer", fontSize: 14, color: "#0D0F13", borderBottom: "1px solid rgba(194,130,102,0.08)", transition: "background 0.15s" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(194,130,102,0.06)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  {p.name}
-                </div>
-              ))}
-            </div>
-          ) : null;
-        })()}
       </div>
 
       {showBanner && updatesCount > 0 && (
@@ -439,11 +417,11 @@ export default function Home() {
       )}
 
       <div className="quick-links">
-        <Link href="/fretes" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit" }}>
+        <Link href="/fretes" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit", minWidth: 0 }}>
           <div className="quick-banner-icon">🚚</div>
           <div className="quick-banner-text"><strong>Tabela de Fretes</strong><span>Valores de entrega</span></div>
         </Link>
-        <Link href="/regras" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit" }}>
+        <Link href="/regras" style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "var(--bg-card)", border: "1px solid var(--border-main)", borderRadius: "10px", textDecoration: "none", color: "inherit", minWidth: 0 }}>
           <div className="quick-banner-icon">📋</div>
           <div className="quick-banner-text"><strong>Regras de Envio</strong><span>Como funciona</span></div>
         </Link>
@@ -474,8 +452,8 @@ export default function Home() {
             const totalProds = cat.brands.reduce((a, b) => a + b.products.length, 0);
             const outProds = cat.brands.reduce((a, b) => a + b.products.filter((p) => p.is_out_of_stock || (p.stock ?? 0) <= 0).length, 0);
             return (
-              <div className={`cat-block`} key={cat.id} style={{ animationDelay: `${ci * 0.07}s` }}>
-                <div className="cat-header" onClick={(e) => { (e.currentTarget.parentElement as HTMLElement)?.classList.toggle("open"); }}>
+              <div className={`cat-block ${openCat === cat.id ? "open" : ""}`} key={cat.id} style={{ animationDelay: `${ci * 0.07}s` }}>
+                <div className="cat-header" onClick={() => setOpenCat(openCat === cat.id ? null : cat.id)}>
                   <div className="cat-icon">{cat.abbr}</div>
                   <div className="cat-info">
                     <div className="cat-name" dangerouslySetInnerHTML={{ __html: highlight(cat.name) }} />
@@ -500,9 +478,6 @@ export default function Home() {
                       <div className="brand-body" style={{ padding: "12px 16px 14px" }}>
                         {brand.products.map((p) => {
                           const outOfStock = p.is_out_of_stock || (p.stock ?? 0) <= 0;
-                          const descParts = (p.description || "").split(" ");
-                          const apresentacao = descParts.slice(0, -1).join(" ") || "—";
-                          const dosagem = descParts[descParts.length - 1] || "—";
                           return (
                             <div className={`product-card-row ${outOfStock ? "out" : ""}`} key={p.id}>
                               {(p as any).image_url ? (
@@ -510,26 +485,29 @@ export default function Home() {
                               ) : (
                                 <div className="pc-placeholder">{(p.name || "").slice(0, 2).toUpperCase()}</div>
                               )}
-                              <div className="pc-info">
-                                <div className="pc-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
-                                <div className="pc-brand">{p.brand}</div>
+                              <div className="pc-info" style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+                                      <div className="pc-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
+                                      {(cat.name || "").toLowerCase() !== "emagrecedores" && (
+                                        <div className="pc-brand">{(p as any).presentation || ""} · {(p as any).dosage || ""}</div>
+                                      )}
+                                  {outOfStock ? (
+                                    <span className="pc-status unavailable" style={{ flexShrink: 0 }}>Indisponível</span>
+                                  ) : (
+                                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                                      <div className="pc-price">
+                                        {p.price ? `R$ ${Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                                      </div>
+                                      <button className="pc-add-btn" onClick={() => addToCart(p)} disabled={addingId === p.id}>
+                                        <ShoppingCart size={14} />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                                {(cat.name || "").toLowerCase() !== "emagrecedores" && (
+                                  <div className="pc-brand">{(p as any).presentation || ""} {(p as any).dosage || ""}</div>
+                                )}
                               </div>
-                              <div className="pc-meta">
-                                <span className="pc-apresentacao">{apresentacao}</span>
-                                <span className="pc-dosagem">{dosagem}</span>
-                              </div>
-                              <div className="pc-price">
-                                {p.price ? `R$ ${Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
-                              </div>
-                              <span className={`pc-status ${outOfStock ? "unavailable" : "available"}`}>
-                                {outOfStock ? "Em Falta" : "Disponível"}
-                              </span>
-                              {!outOfStock && (
-                                <button className="pc-add-btn" onClick={() => addToCart(p)} disabled={addingId === p.id}>
-                                  <ShoppingCart size={14} />
-                                  {addingId === p.id ? "..." : "Adicionar"}
-                                </button>
-                              )}
                             </div>
                           );
                         })}
