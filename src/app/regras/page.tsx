@@ -100,6 +100,7 @@ export default function RegrasPage() {
         .rg-section-updated { font-size: 10px; color: #A8978E; letter-spacing: 0.5px; text-transform: uppercase; }
 
         .rg-section-body { padding: 18px 20px; font-size: 14px; line-height: 1.7; color: #3A2E28; white-space: pre-wrap; }
+        .rg-section-body .rg-bold-line { font-weight: 700; font-size: 15px; color: #0D0F13; display: block; margin-bottom: 4px; }
 
         .rg-footer { margin-top: 40px; padding-top: 24px; border-top: 1px solid rgba(194,130,102,0.15); text-align: center; font-size: 12px; color: #A8978E; }
       `}</style>
@@ -136,7 +137,15 @@ export default function RegrasPage() {
                 </span>
                 <span className="rg-section-updated">Atualizado</span>
               </div>
-              <div className="rg-section-body">{item.text}</div>
+              <div className="rg-section-body">
+                {item.text.split("\n").map((line, i) =>
+                  i === 0 && item.id === "pagamento" ? (
+                    <span key={i} className="rg-bold-line">{line}</span>
+                  ) : (
+                    <span key={i}>{line}{"\n"}</span>
+                  ),
+                )}
+              </div>
             </div>
           ))}
         </div>
