@@ -259,7 +259,7 @@ export default function Home() {
         .notif-text strong { display: block; font-size: 15px; font-weight: 600; color: var(--text-primary); }
         .notif-text span { font-size: 12px; color: var(--text-muted); }
         .notif-close { margin-left: auto; color: var(--text-dim); font-size: 18px; cursor: pointer; padding: 4px; }
-        .quick-links { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+        .quick-links { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px; }
         .quick-banner-icon { width: 32px; height: 32px; background: rgba(194,130,102,0.1); border: 1px solid var(--border-main); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
         @media (max-width: 480px) { .quick-banner-icon { width: 28px; height: 28px; font-size: 13px; } }
         .quick-banner-text strong { display: block; font-size: 15px; font-weight: 600; color: var(--text-primary); }
