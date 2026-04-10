@@ -1546,119 +1546,266 @@ export default function Home() {
                   <span className="cat-arrow">▼</span>
                 </div>
                 <div className="cat-body">
-                  {cat.brands.map((brand, bi) => (
-                    <div
-                      className={`brand-block ${search ? "open" : ""}`}
-                      key={bi}
-                    >
-                      <div
-                        className="brand-header"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          (
-                            e.currentTarget.parentElement as HTMLElement
-                          )?.classList.toggle("open");
-                        }}
-                      >
-                        <div className="brand-dot"></div>
-                        <span
-                          className="brand-name"
-                          dangerouslySetInnerHTML={{
-                            __html: highlight(brand.name),
-                          }}
-                        />
-                        <span className="brand-count">
-                          {brand.products.length} produto
-                          {brand.products.length !== 1 ? "s" : ""}
-                        </span>
-                        <span className="brand-arrow">▼</span>
-                      </div>
-                      <div
-                        className="brand-body"
-                        style={{ padding: "12px 16px 14px" }}
-                      >
-                        {brand.products.map((p) => {
-                          const outOfStock =
-                            p.is_out_of_stock || (p.stock ?? 0) <= 0;
-                          return (
+                  {cat.name.toLowerCase() === "emagrecedores"
+                    ? [
+                        "Tirzepatida",
+                        "Retatrutida",
+                        "Semaglutida",
+                        "Outros",
+                      ].map((principio) => {
+                        const marcas = cat.brands.filter(
+                          (b) => b.groupKey === principio,
+                        );
+                        if (marcas.length === 0) return null;
+                        return (
+                          <div key={principio} style={{ marginBottom: 12 }}>
                             <div
-                              className={`product-card-row ${outOfStock ? "out" : ""}`}
-                              key={p.id}
+                              style={{
+                                padding: "8px 16px",
+                                fontFamily: "Raleway, sans-serif",
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: "var(--accent-terra-dark)",
+                                letterSpacing: 1,
+                                textTransform: "uppercase",
+                                borderBottom: "1px solid var(--border-dim)",
+                                marginBottom: 8,
+                              }}
                             >
-                              {(p as any).image_url ? (
-                                <img
-                                  src={(p as any).image_url}
-                                  alt={p.name}
-                                  className="pc-img"
-                                />
-                              ) : (
-                                <div className="pc-placeholder">
-                                  {(p.name || "").slice(0, 2).toUpperCase()}
-                                </div>
-                              )}
+                              ◈ {principio}
+                            </div>
+                            {marcas.map((brand, bi) => (
                               <div
-                                className="pc-info"
-                                style={{ flex: 1, minWidth: 0 }}
+                                className={`brand-block ${search ? "open" : ""}`}
+                                key={bi}
                               >
                                 <div
-                                  className="pc-name"
-                                  dangerouslySetInnerHTML={{
-                                    __html: highlight(p.name),
-                                  }}
-                                />
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    marginTop: 4,
+                                  className="brand-header"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    (
+                                      e.currentTarget
+                                        .parentElement as HTMLElement
+                                    )?.classList.toggle("open");
                                   }}
                                 >
-                                  <div className="pc-brand">
-                                    {(p as any).dosage || ""}
-                                  </div>
-                                  <div style={{ flexShrink: 0 }}>
-                                    {outOfStock ? (
-                                      <span className="pc-status unavailable">
-                                        Indisponível
-                                      </span>
-                                    ) : (
-                                      <div
-                                        style={{
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: "8px",
-                                        }}
-                                      >
-                                        <div className="pc-price">
-                                          {p.price
-                                            ? `R$ ${Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
-                                            : "—"}
-                                        </div>
-                                        <button
-                                          className="pc-add-btn"
-                                          onClick={() => addToCart(p)}
-                                          disabled={addingId === p.id}
-                                        >
-                                          <ShoppingCart size={14} />
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
+                                  <div className="brand-dot"></div>
+                                  <span
+                                    className="brand-name"
+                                    dangerouslySetInnerHTML={{
+                                      __html: highlight(brand.name),
+                                    }}
+                                  />
+                                  <span className="brand-count">
+                                    {brand.products.length} produto
+                                    {brand.products.length !== 1 ? "s" : ""}
+                                  </span>
+                                  <span className="brand-arrow">▼</span>
                                 </div>
                                 <div
-                                  className="pc-brand"
-                                  style={{ marginTop: 2 }}
+                                  className="brand-body"
+                                  style={{ padding: "12px 16px 14px" }}
                                 >
-                                  {(p as any).presentation || ""}
+                                  {brand.products.map((p) => {
+                                    const outOfStock =
+                                      p.is_out_of_stock || (p.stock ?? 0) <= 0;
+                                    return (
+                                      <div
+                                        className={`product-card-row ${outOfStock ? "out" : ""}`}
+                                        key={p.id}
+                                      >
+                                        {(p as any).image_url ? (
+                                          <img
+                                            src={(p as any).image_url}
+                                            alt={p.name}
+                                            className="pc-img"
+                                          />
+                                        ) : (
+                                          <div className="pc-placeholder">
+                                            {(p.name || "")
+                                              .slice(0, 2)
+                                              .toUpperCase()}
+                                          </div>
+                                        )}
+                                        <div
+                                          className="pc-info"
+                                          style={{ flex: 1, minWidth: 0 }}
+                                        >
+                                          <div
+                                            className="pc-name"
+                                            dangerouslySetInnerHTML={{
+                                              __html: highlight(p.name),
+                                            }}
+                                          />
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              justifyContent: "space-between",
+                                              marginTop: 4,
+                                            }}
+                                          >
+                                            <div className="pc-brand">
+                                              {(p as any).dosage || ""}
+                                            </div>
+                                            <div style={{ flexShrink: 0 }}>
+                                              {outOfStock ? (
+                                                <span className="pc-status unavailable">
+                                                  Indisponível
+                                                </span>
+                                              ) : (
+                                                <div
+                                                  style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: "8px",
+                                                  }}
+                                                >
+                                                  <div className="pc-price">
+                                                    {p.price
+                                                      ? `R$ ${Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                                                      : "—"}
+                                                  </div>
+                                                  <button
+                                                    className="pc-add-btn"
+                                                    onClick={() => addToCart(p)}
+                                                    disabled={addingId === p.id}
+                                                  >
+                                                    <ShoppingCart size={14} />
+                                                  </button>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <div
+                                            className="pc-brand"
+                                            style={{ marginTop: 2 }}
+                                          >
+                                            {(p as any).presentation || ""}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
+                            ))}
+                          </div>
+                        );
+                      })
+                    : cat.brands.map((brand, bi) => (
+                        <div
+                          className={`brand-block ${search ? "open" : ""}`}
+                          key={bi}
+                        >
+                          <div
+                            className="brand-header"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              (
+                                e.currentTarget.parentElement as HTMLElement
+                              )?.classList.toggle("open");
+                            }}
+                          >
+                            <div className="brand-dot"></div>
+                            <span
+                              className="brand-name"
+                              dangerouslySetInnerHTML={{
+                                __html: highlight(brand.name),
+                              }}
+                            />
+                            <span className="brand-count">
+                              {brand.products.length} produto
+                              {brand.products.length !== 1 ? "s" : ""}
+                            </span>
+                            <span className="brand-arrow">▼</span>
+                          </div>
+                          <div
+                            className="brand-body"
+                            style={{ padding: "12px 16px 14px" }}
+                          >
+                            {brand.products.map((p) => {
+                              const outOfStock =
+                                p.is_out_of_stock || (p.stock ?? 0) <= 0;
+                              return (
+                                <div
+                                  className={`product-card-row ${outOfStock ? "out" : ""}`}
+                                  key={p.id}
+                                >
+                                  {(p as any).image_url ? (
+                                    <img
+                                      src={(p as any).image_url}
+                                      alt={p.name}
+                                      className="pc-img"
+                                    />
+                                  ) : (
+                                    <div className="pc-placeholder">
+                                      {(p.name || "").slice(0, 2).toUpperCase()}
+                                    </div>
+                                  )}
+                                  <div
+                                    className="pc-info"
+                                    style={{ flex: 1, minWidth: 0 }}
+                                  >
+                                    <div
+                                      className="pc-name"
+                                      dangerouslySetInnerHTML={{
+                                        __html: highlight(p.name),
+                                      }}
+                                    />
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        marginTop: 4,
+                                      }}
+                                    >
+                                      <div className="pc-brand">
+                                        {(p as any).dosage || ""}
+                                      </div>
+                                      <div style={{ flexShrink: 0 }}>
+                                        {outOfStock ? (
+                                          <span className="pc-status unavailable">
+                                            Indisponível
+                                          </span>
+                                        ) : (
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: "8px",
+                                            }}
+                                          >
+                                            <div className="pc-price">
+                                              {p.price
+                                                ? `R$ ${Number(p.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                                                : "—"}
+                                            </div>
+                                            <button
+                                              className="pc-add-btn"
+                                              onClick={() => addToCart(p)}
+                                              disabled={addingId === p.id}
+                                            >
+                                              <ShoppingCart size={14} />
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div
+                                      className="pc-brand"
+                                      style={{ marginTop: 2 }}
+                                    >
+                                      {(p as any).presentation || ""}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                 </div>
               </div>
             );
