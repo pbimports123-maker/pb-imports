@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { ShoppingCart, Plus, Minus, X } from "lucide-react";
 import { Product, Category } from "@/types/product";
 
-type BrandGroup = { name: string; products: Product[] };
+type BrandGroup = { name: string; groupKey?: string; products: Product[] };
 type CategoryGroup = {
   id: string;
   name: string;
@@ -34,6 +34,27 @@ function getLastVisit(): string | null {
 function saveLastVisit(): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
+}
+
+const TIRZEPATIDA_NOMES = [
+  "tirzepatida",
+  "lipoland",
+  "lipoless",
+  "mounjaro",
+  "t.g",
+  "tirzec",
+];
+
+function getEmagrecedorPrincipioAtivo(productName: string): string {
+  const lower = (productName || "").toLowerCase();
+  if (TIRZEPATIDA_NOMES.some((m) => lower === m || lower.startsWith(m))) {
+    return "Tirzepatida";
+  }
+  if (lower.includes("retatrutida") || lower.includes("retatrutide")) {
+    return "Retatrutida";
+  }
+  if (lower.includes("semaglutida")) return "Semaglutida";
+  return "Outros";
 }
 
 export default function Home() {
@@ -236,6 +257,8 @@ export default function Home() {
 
   const groups: CategoryGroup[] = useMemo(() => {
     const normalized = categories.map((cat) => {
+      const isEmagrecedores =
+        (cat.name || "").toLowerCase() === "emagrecedores";
       const catProducts = products.filter((p) => p.category_id === cat.id);
       const filtered = catProducts.filter((p) => {
         if (!search) return true;
@@ -249,12 +272,18 @@ export default function Home() {
 
       const groupMap = new Map<string, Product[]>();
       filtered.forEach((p) => {
-        const key = p.brand || "Outros";
+        const key = isEmagrecedores
+          ? `${getEmagrecedorPrincipioAtivo(p.name || "")}||${p.brand || "Outros"}`
+          : p.brand || "Outros";
         groupMap.set(key, [...(groupMap.get(key) || []), p]);
       });
 
       const brands: BrandGroup[] = Array.from(groupMap.entries()).map(
-        ([name, products]) => ({ name, products }),
+        ([name, products]) => ({
+          name: isEmagrecedores ? name.split("||")[1] : name,
+          groupKey: isEmagrecedores ? name.split("||")[0] : undefined,
+          products,
+        }),
       );
       return {
         id: cat.id,
