@@ -487,10 +487,7 @@ export default function Home() {
                               )}
                               <div className="pc-info" style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
-                                      <div className="pc-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
-                                      {(cat.name || "").toLowerCase() !== "emagrecedores" && (
-                                        <div className="pc-brand">{(p as any).presentation || ""} · {(p as any).dosage || ""}</div>
-                                      )}
+                                    <div className="pc-name" dangerouslySetInnerHTML={{ __html: highlight(p.name) }} />
                                   {outOfStock ? (
                                     <span className="pc-status unavailable" style={{ flexShrink: 0 }}>Indisponível</span>
                                   ) : (
