@@ -243,11 +243,14 @@ export default function AdminOrdersPage() {
                   <div className="section-title">📦 Itens do Pedido</div>
                   {order.items ? (
                     <table className="items-table">
-                      <thead><tr><th>Produto</th><th>Qtd</th><th>Preço Unit.</th><th>Subtotal</th></tr></thead>
+                      <thead><tr><th>Produto</th><th>Marca</th><th>Dosagem</th><th>Apresentação</th><th>Qtd</th><th>Preço Unit.</th><th>Subtotal</th></tr></thead>
                       <tbody>
                         {order.items.map(item => (
                           <tr key={item.id}>
                             <td>{item.product_name}</td>
+                            <td>{(item as any).product_brand || "—"}</td>
+                            <td>{(item as any).product_dosage || "—"}</td>
+                            <td>{(item as any).product_presentation || "—"}</td>
                             <td>{item.quantity}</td>
                             <td>R$ {Number(item.product_price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
                             <td>R$ {Number(item.subtotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
