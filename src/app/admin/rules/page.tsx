@@ -187,7 +187,9 @@ export default function AdminRulesPage() {
         <div className="bottom-btns">
           <button className="btn" onClick={handleReset}>Limpar</button>
           <button className="btn" onClick={()=>setShowPreview(true)}>Preview</button>
-          <button className="btn save" onClick={handleSave} disabled={saving}>Salvar</button>
+          <button className="btn save" onClick={handleSave} disabled={saving} style={{ padding: "10px 24px", background: "#C28266", color: "#fff", border: "none", fontFamily: "Raleway, sans-serif", fontWeight: 700, fontSize: 13, cursor: "pointer", borderRadius: 6 }}>
+            {saving ? "Salvando..." : "Salvar"}
+          </button>
         </div>
       </div>
 
