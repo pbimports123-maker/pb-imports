@@ -81,6 +81,12 @@ export default function CheckoutPage() {
     street: "", number: "", complement: "", district: "", zip: "", city: "", state: "",
   });
 
+  useEffect(() => {
+    if (selectedShipping && !selectedShipping.service_type.toLowerCase().includes("transportadora")) {
+      setHasInsurance(false);
+    }
+  }, [selectedShipping]);
+
   useEffect(() => { setMounted(true); }, []);
 
   // Carregar configurações da loja
@@ -402,17 +408,19 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* Seguro */}
-            <div style={{ marginTop: 16 }}>
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: 16, border: `1.5px solid ${hasInsurance ? "#C28266" : "rgba(194,130,102,0.2)"}`, borderRadius: 10, cursor: "pointer", background: hasInsurance ? "rgba(194,130,102,0.04)" : "#fff" }}>
-                <input type="checkbox" checked={hasInsurance} onChange={e => setHasInsurance(e.target.checked)} style={{ accentColor: "#C28266", width: 18, height: 18, marginTop: 2 }} />
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>🔒 Adicionar Seguro</div>
-                  <div style={{ fontSize: 12, color: "#7A6558", marginTop: 4, lineHeight: 1.5 }}>Garante reenvio em caso de extravio. Com seguro, envio somente via Transportadora.</div>
-                  {hasInsurance && <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 13, fontWeight: 700, color: "#C28266", marginTop: 6 }}>+ R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (15% do subtotal)</div>}
-                </div>
-              </label>
-            </div>
+            {/* Seguro - só aparece se transportadora selecionada */}
+            {selectedShipping && selectedShipping.service_type.toLowerCase().includes("transportadora") && (
+              <div style={{ marginTop: 16 }}>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: 16, border: `1.5px solid ${hasInsurance ? "#C28266" : "rgba(194,130,102,0.2)"}`, borderRadius: 10, cursor: "pointer", background: hasInsurance ? "rgba(194,130,102,0.04)" : "#fff" }}>
+                  <input type="checkbox" checked={hasInsurance} onChange={e => setHasInsurance(e.target.checked)} style={{ accentColor: "#C28266", width: 18, height: 18, marginTop: 2 }} />
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>🔒 Adicionar Seguro</div>
+                    <div style={{ fontSize: 12, color: "#7A6558", marginTop: 4, lineHeight: 1.5 }}>Garante reenvio em caso de extravio.</div>
+                    {hasInsurance && <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 13, fontWeight: 700, color: "#C28266", marginTop: 6 }}>+ R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (15% do subtotal)</div>}
+                  </div>
+                </label>
+              </div>
+            )}
 
             {/* Resumo */}
             <div style={{ marginTop: 20, padding: 16, background: "#FAF8EF", borderRadius: 10, border: "1px solid rgba(194,130,102,0.15)" }}>
