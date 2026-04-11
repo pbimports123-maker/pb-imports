@@ -238,7 +238,7 @@ export default function CheckoutPage() {
   const openWhatsApp = () => {
     const seguroTexto = hasInsurance ? `\nSeguro (15%): R$ ${insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "";
     const itens = cartItems.map(i => `${i.quantity}x ${i.product.name}${i.product.brand ? ` (${i.product.brand})` : ""} - R$ ${(Number(i.product.price) * i.quantity).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`).join("\n");
-    const msg = `*NOVO PEDIDO - PB Imports*\n\nNome: ${form.name}\nCPF: ${form.cpf}\nTelefone: ${form.phone}\nEndereço: ${form.street}, ${form.number}${form.complement ? ` - ${form.complement}` : ""}\nBairro: ${form.district}\nCidade/Estado: ${form.city}/${form.state}\nCEP: ${form.zip}\n\n${itens}\n\nSubtotal: R$ ${subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\nFrete (${selectedShipping?.service_type}): R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}${seguroTexto}\n*Total Final: R$ ${total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`;
+    const msg = `*NOVO PEDIDO - PB Imports*\n\nNome: ${form.name}\nCPF: ${form.cpf}\nTelefone: ${form.phone}\nEndereço: ${form.street}, ${form.number}${form.complement ? ` - ${form.complement}` : ""}\nBairro: ${form.district}\nCidade/Estado: ${form.city}/${form.state}\nCEP: ${form.zip}\n\n${itens}\n\nSubtotal: R$ ${subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\nFrete (${selectedShipping?.service_type}): R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\nSeguro: ${hasInsurance ? `Sim - R$ ${insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "Não"}\n*Total Final: R$ ${total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`;
     const number = storeSettings.whatsapp_number.replace(/\D/g, "");
     window.open(`https://wa.me/${number}?text=${encodeURIComponent(msg)}`, "_blank");
     setTimeout(() => setStep("confirmado"), 1500);
@@ -517,7 +517,7 @@ export default function CheckoutPage() {
             <div style={{ width: 64, height: 64, borderRadius: "50%", background: "rgba(122,175,144,0.15)", border: "2px solid #7AAF90", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
               <CheckCircle size={32} color="#7AAF90" />
             </div>
-            <h2 style={{ fontFamily: "Raleway, sans-serif", fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Pedido enviado!</h2>
+            <h2 style={{ fontFamily: "Raleway, sans-serif", fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Pedido finalizado!</h2>
             <p style={{ fontSize: 14, color: "#7A6558", marginBottom: 6 }}>Seu pedido foi enviado para o WhatsApp do vendedor.</p>
             <p style={{ fontSize: 14, color: "#7A6558", marginBottom: 24 }}>Aguarde a confirmação.</p>
             <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 20, fontWeight: 700, color: "#C28266", marginBottom: 28 }}>
