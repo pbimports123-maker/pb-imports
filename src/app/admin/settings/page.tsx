@@ -13,9 +13,13 @@ type StoreSettings = {
   contact_phone: string;
   address: string;
   instagram_url: string;
+  pix_key: string;
+  pix_holder: string;
+  pix_bank: string;
+  whatsapp_number: string;
 };
 
-type TabKey = "store" | "users" | "security";
+type TabKey = "store" | "payments" | "users" | "security";
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<StoreSettings>({
@@ -24,6 +28,10 @@ export default function AdminSettingsPage() {
     contact_phone: "",
     address: "",
     instagram_url: "",
+    pix_key: "",
+    pix_holder: "",
+    pix_bank: "",
+    whatsapp_number: "",
   });
   const [tab, setTab] = useState<TabKey>("store");
   const [loading, setLoading] = useState(true);
@@ -43,6 +51,10 @@ export default function AdminSettingsPage() {
         contact_phone: data.contact_phone ?? "",
         address: data.address ?? "",
         instagram_url: data.instagram_url ?? "",
+        pix_key: data.pix_key ?? "",
+        pix_holder: data.pix_holder ?? "",
+        pix_bank: data.pix_bank ?? "",
+        whatsapp_number: data.whatsapp_number ?? "",
         id: data.id,
       });
     } catch (err: any) {
@@ -51,9 +63,9 @@ export default function AdminSettingsPage() {
   }
 
   const filledPct = useMemo(() => {
-    const total = 5;
-    const filled = [settings.store_name, settings.contact_email, settings.contact_phone, settings.address, settings.instagram_url]
+    const filled = [settings.store_name, settings.contact_email, settings.contact_phone, settings.address, settings.instagram_url, settings.pix_key, settings.pix_holder, settings.whatsapp_number]
       .filter(v => v && v.trim().length > 0).length;
+    const total = 8;
     return { filled, pct: Math.round((filled / total) * 100) };
   }, [settings]);
 
@@ -145,12 +157,13 @@ export default function AdminSettingsPage() {
         <div className="progress-track">
           <div className="progress-fill" style={{ width: `${filledPct.pct}%` }} />
         </div>
-        <span className="progress-val">{filledPct.filled} / 5</span>
+        <span className="progress-val">{filledPct.filled} / 8</span>
       </div>
 
       {/* Tabs */}
       <div className="tabs">
         <button className={`tab ${tab === "store" ? "active" : ""}`} onClick={() => setTab("store")}>Dados da Loja</button>
+        <button className={`tab ${tab === "payments" ? "active" : ""}`} onClick={() => setTab("payments")}>Pagamentos</button>
         <button className={`tab ${tab === "users" ? "active" : ""}`} onClick={() => setTab("users")}>Usuários</button>
         <button className={`tab ${tab === "security" ? "active" : ""}`} onClick={() => setTab("security")}>Segurança</button>
       </div>
@@ -184,6 +197,39 @@ export default function AdminSettingsPage() {
                 <div className="field" style={{ gridColumn: "1 / -1" }}>
                   <span className="label">Endereço Físico (Opcional)</span>
                   <input className="input" value={settings.address} onChange={e => setSettings({ ...settings, address: e.target.value })} placeholder="Rua, número, cidade" />
+                </div>
+              </div>
+              <div className="actions">
+                <button className="btn-ghost" onClick={fetchSettings}>Recarregar</button>
+                <button className="btn-main" onClick={handleSave} disabled={saving}>
+                  {saving ? "Salvando..." : "Salvar Alterações"}
+                </button>
+              </div>
+              <div className="last-saved">{lastSaved}</div>
+            </div>
+          )}
+
+          {/* Pagamentos */}
+          {tab === "payments" && (
+            <div className="panel" key="payments">
+              <h3>Configurações de Pagamento</h3>
+              <p>Configure a chave PIX e o WhatsApp para receber pedidos.</p>
+              <div className="grid">
+                <div className="field">
+                  <span className="label">Chave PIX</span>
+                  <input className="input" value={settings.pix_key} onChange={e => setSettings({ ...settings, pix_key: e.target.value })} placeholder="CNPJ, CPF, e-mail ou telefone" />
+                </div>
+                <div className="field">
+                  <span className="label">Nome do Titular</span>
+                  <input className="input" value={settings.pix_holder} onChange={e => setSettings({ ...settings, pix_holder: e.target.value })} placeholder="Nome completo ou razão social" />
+                </div>
+                <div className="field">
+                  <span className="label">Banco</span>
+                  <input className="input" value={settings.pix_bank} onChange={e => setSettings({ ...settings, pix_bank: e.target.value })} placeholder="Ex: Nubank, Itaú, Bradesco..." />
+                </div>
+                <div className="field">
+                  <span className="label">WhatsApp do Admin</span>
+                  <input className="input" value={settings.whatsapp_number} onChange={e => setSettings({ ...settings, whatsapp_number: e.target.value })} placeholder="5511999999999 (com código do país)" />
                 </div>
               </div>
               <div className="actions">
