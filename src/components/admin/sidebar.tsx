@@ -17,6 +17,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label: "Regras", href: "/admin/rules", icon: "⊛" },
   { label: "Curiosidades", href: "/admin/curiosidades", icon: "✦" },
   { label: "Categorias", href: "/admin/categories", icon: "⊞" },
+  { label: "Pedidos", href: "/admin/orders", icon: "🛍" },
   { label: "Relatórios", href: "/admin/reports", icon: "⌬" },
   { label: "Configurações", href: "/admin/settings", icon: "⚙" },
 ];
