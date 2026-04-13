@@ -81,15 +81,8 @@ export default function CheckoutPage() {
     street: "", number: "", complement: "", district: "", zip: "", city: "", state: "",
   });
 
-  useEffect(() => {
-    if (selectedShipping && !selectedShipping.service_type.toLowerCase().includes("transportadora")) {
-      setHasInsurance(false);
-    }
-  }, [selectedShipping]);
-
   useEffect(() => { setMounted(true); }, []);
 
-  // Carregar configurações da loja
   useEffect(() => {
     async function loadSettings() {
       const { data } = await supabase.from("store_settings").select("pix_key, pix_holder, pix_bank, whatsapp_number").maybeSingle();
@@ -130,6 +123,7 @@ export default function CheckoutPage() {
       );
       setShippingRates(filtered);
       setSelectedShipping(null);
+      setHasInsurance(false);
     }
     loadShipping();
   }, [form.state]);
@@ -229,7 +223,7 @@ export default function CheckoutPage() {
       if (cart) await supabase.from("cart_items").delete().eq("cart_id", cart.id);
 
       setOrderId(order.id);
-      setStep("pagamento");
+      router.push(`/pedido/${order.id}`);
     } catch (err: any) {
       toast.error("Erro ao finalizar pedido: " + err.message);
     } finally {
@@ -245,7 +239,6 @@ export default function CheckoutPage() {
   };
 
   const openWhatsApp = () => {
-    const seguroTexto = hasInsurance ? `\nSeguro (15%): R$ ${insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "";
     const itens = cartItems.map(i => `${i.quantity}x ${i.product.name}${i.product.brand ? ` (${i.product.brand})` : ""} - R$ ${(Number(i.product.price) * i.quantity).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`).join("\n");
     const msg = `*NOVO PEDIDO - PB Imports*\n\nNome: ${form.name}\nCPF: ${form.cpf}\nTelefone: ${form.phone}\nEndereço: ${form.street}, ${form.number}${form.complement ? ` - ${form.complement}` : ""}\nBairro: ${form.district}\nCidade/Estado: ${form.city}/${form.state}\nCEP: ${form.zip}\n\n${itens}\n\nSubtotal: R$ ${subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\nFrete (${selectedShipping?.service_type}): R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\nSeguro: ${hasInsurance ? `Sim - R$ ${insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "Não"}\n*Total Final: R$ ${total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`;
     const number = storeSettings.whatsapp_number.replace(/\D/g, "");
@@ -393,42 +386,73 @@ export default function CheckoutPage() {
               <p style={{ fontSize: 13, color: "#B0A090", textAlign: "center", padding: "20px 0" }}>Nenhuma opção disponível para {form.state}</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {shippingRates.map(rate => (
-                  <label key={rate.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: `1.5px solid ${selectedShipping?.id === rate.id ? "#C28266" : "rgba(194,130,102,0.2)"}`, borderRadius: 10, cursor: "pointer", background: selectedShipping?.id === rate.id ? "rgba(194,130,102,0.04)" : "#fff" }}>
-                    <input type="radio" name="shipping" checked={selectedShipping?.id === rate.id} onChange={() => setSelectedShipping(rate)} style={{ accentColor: "#C28266" }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600 }}>{rate.service_type} (sem seguro)</div>
-                      <div style={{ fontSize: 12, color: "#A8978E", marginTop: 2 }}>Envio padrão</div>
-                    </div>
-                    <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 15, fontWeight: 700, color: "#C28266" }}>
-                      R$ {Number(rate.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
+                {shippingRates.map(rate => {
+                  const isTransportadora = rate.service_type.toLowerCase().includes("transportadora");
+                  const insuranceValue = subtotal * 0.15;
 
-            {/* Seguro - só aparece se transportadora selecionada */}
-            {selectedShipping && selectedShipping.service_type.toLowerCase().includes("transportadora") && (
-              <div style={{ marginTop: 16 }}>
-                <label style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: 16, border: `1.5px solid ${hasInsurance ? "#C28266" : "rgba(194,130,102,0.2)"}`, borderRadius: 10, cursor: "pointer", background: hasInsurance ? "rgba(194,130,102,0.04)" : "#fff" }}>
-                  <input type="checkbox" checked={hasInsurance} onChange={e => setHasInsurance(e.target.checked)} style={{ accentColor: "#C28266", width: 18, height: 18, marginTop: 2 }} />
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>🔒 Adicionar Seguro</div>
-                    <div style={{ fontSize: 12, color: "#7A6558", marginTop: 4, lineHeight: 1.5 }}>Garante reenvio em caso de extravio.</div>
-                    {hasInsurance && <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 13, fontWeight: 700, color: "#C28266", marginTop: 6 }}>+ R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (15% do subtotal)</div>}
-                  </div>
-                </label>
+                  return (
+                    <div key={rate.id}>
+                      {/* Opção SEM seguro */}
+                      <label style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: `1.5px solid ${selectedShipping?.id === rate.id && !hasInsurance ? "#C28266" : "rgba(194,130,102,0.2)"}`, borderRadius: 10, cursor: "pointer", background: selectedShipping?.id === rate.id && !hasInsurance ? "rgba(194,130,102,0.04)" : "#fff", marginBottom: isTransportadora ? 8 : 0 }}>
+                        <input type="radio" name="shipping" checked={selectedShipping?.id === rate.id && !hasInsurance} onChange={() => { setSelectedShipping(rate); setHasInsurance(false); }} style={{ accentColor: "#C28266" }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600 }}>
+                            {rate.service_type}
+                            <span style={{ fontSize: 12, color: "#A8978E", fontWeight: 400 }}> (sem seguro)</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: "#A8978E", marginTop: 2 }}>Envio padrão</div>
+                        </div>
+                        <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 15, fontWeight: 700, color: "#C28266" }}>
+                          R$ {Number(rate.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        </div>
+                      </label>
+
+                      {/* Opção COM seguro — só para transportadora */}
+                      {isTransportadora && (
+                        <label style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: `1.5px solid ${selectedShipping?.id === rate.id && hasInsurance ? "#5A8F70" : "rgba(122,175,144,0.3)"}`, borderRadius: 10, cursor: "pointer", background: selectedShipping?.id === rate.id && hasInsurance ? "rgba(122,175,144,0.06)" : "rgba(122,175,144,0.02)" }}>
+                          <input type="radio" name="shipping" checked={selectedShipping?.id === rate.id && hasInsurance} onChange={() => { setSelectedShipping(rate); setHasInsurance(true); }} style={{ accentColor: "#5A8F70" }} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600 }}>
+                              {rate.service_type}
+                              <span style={{ fontSize: 12, color: "#5A8F70", fontWeight: 600 }}> + Seguro 🔒</span>
+                            </div>
+                            <div style={{ fontSize: 12, color: "#7A6558", marginTop: 2 }}>Garante reenvio em caso de extravio</div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 15, fontWeight: 700, color: "#5A8F70" }}>
+                              R$ {(Number(rate.price) + insuranceValue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            </div>
+                            <div style={{ fontSize: 10, color: "#A8978E", marginTop: 2 }}>
+                              frete + R$ {insuranceValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} seguro
+                            </div>
+                          </div>
+                        </label>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
             {/* Resumo */}
             <div style={{ marginTop: 20, padding: 16, background: "#FAF8EF", borderRadius: 10, border: "1px solid rgba(194,130,102,0.15)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}><span style={{ color: "#7A6558" }}>Subtotal produtos</span><strong>R$ {subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}><span style={{ color: "#7A6558" }}>Frete</span><strong>{selectedShipping ? `R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}</strong></div>
-              {hasInsurance && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}><span style={{ color: "#7A6558" }}>Seguro (15%)</span><strong>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>}
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
+                <span style={{ color: "#7A6558" }}>Subtotal produtos</span>
+                <strong>R$ {subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
+                <span style={{ color: "#7A6558" }}>Frete</span>
+                <strong>{selectedShipping ? `R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}</strong>
+              </div>
+              {hasInsurance && (
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
+                  <span style={{ color: "#7A6558" }}>🔒 Seguro (15%)</span>
+                  <strong style={{ color: "#5A8F70" }}>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+                </div>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Raleway, sans-serif", fontSize: 18, fontWeight: 700, marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(194,130,102,0.15)" }}>
-                <span>Total</span><strong style={{ color: "#9E6650" }}>R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+                <span>Total</span>
+                <strong style={{ color: "#9E6650" }}>R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
               </div>
             </div>
 
@@ -448,7 +472,6 @@ export default function CheckoutPage() {
         {/* STEP: PAGAMENTO */}
         {step === "pagamento" && (
           <div style={{ background: "#fff", border: "1px solid rgba(194,130,102,0.18)", borderRadius: 14, padding: 24 }}>
-            {/* Resumo */}
             <div style={{ marginBottom: 24, padding: 16, background: "#FAF8EF", borderRadius: 10, border: "1px solid rgba(194,130,102,0.15)" }}>
               <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12, color: "#7A6558" }}>Resumo do Pedido</div>
               {cartItems.map(i => (
@@ -460,20 +483,19 @@ export default function CheckoutPage() {
               <div style={{ borderTop: "1px solid rgba(194,130,102,0.15)", marginTop: 10, paddingTop: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}><span style={{ color: "#7A6558" }}>Subtotal</span><strong>R$ {subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}><span style={{ color: "#7A6558" }}>Frete ({selectedShipping?.service_type})</span><strong>R$ {shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
-                {hasInsurance && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}><span style={{ color: "#7A6558" }}>Seguro (15%)</span><strong>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>}
+                {hasInsurance && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}><span style={{ color: "#7A6558" }}>🔒 Seguro (15%)</span><strong style={{ color: "#5A8F70" }}>R$ {insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>}
                 <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "Raleway, sans-serif", fontSize: 20, fontWeight: 700, marginTop: 8 }}>
                   <span>TOTAL</span><strong style={{ color: "#9E6650" }}>R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
                 </div>
               </div>
             </div>
 
-            {/* PIX */}
             <div style={{ padding: 20, background: "#fff", border: "1px solid rgba(194,130,102,0.2)", borderRadius: 12, marginBottom: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, fontFamily: "Raleway, sans-serif", fontSize: 14, fontWeight: 700, color: "#0D0F13" }}>
                 💳 Pagamento via PIX
               </div>
               <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 11, color: "#A8978E", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Chave PIX (CNPJ)</div>
+                <div style={{ fontSize: 11, color: "#A8978E", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Chave PIX</div>
                 <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 20, fontWeight: 700, color: "#0D0F13", letterSpacing: 1 }}>{storeSettings.pix_key || "—"}</div>
               </div>
               {storeSettings.pix_holder && (
@@ -483,9 +505,9 @@ export default function CheckoutPage() {
                 </div>
               )}
               <div style={{ padding: "10px 14px", background: "rgba(212,169,106,0.1)", border: "1px solid rgba(212,169,106,0.3)", borderRadius: 8, fontSize: 12, color: "#8A6830", marginBottom: 16 }}>
-                ⚠️ Use esta chave <strong>somente para este pedido</strong>. Ela pode ser alterada a qualquer momento.
+                ⚠️ Use esta chave <strong>somente para este pedido</strong>.
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
                   <div style={{ fontSize: 11, color: "#A8978E", marginBottom: 4 }}>Valor a pagar</div>
                   <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 24, fontWeight: 700, color: "#C28266" }}>R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
@@ -496,17 +518,16 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Como Finalizar */}
             <div style={{ padding: 20, background: "#FAF8EF", borderRadius: 12, marginBottom: 16 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#A8978E", textTransform: "uppercase", letterSpacing: 1, marginBottom: 14 }}>Como Finalizar</div>
               {[
                 { n: 1, text: "Copie a chave PIX acima e realize o pagamento pelo app do seu banco" },
-                { n: 2, text: "Clique em Finalizar Pedido abaixo para enviar os dados do pedido via WhatsApp" },
+                { n: 2, text: "Clique em Finalizar Pedido abaixo para enviar os dados via WhatsApp" },
                 { n: 3, text: "Na conversa do WhatsApp, envie o comprovante de pagamento para confirmar" },
               ].map(({ n, text }) => (
                 <div key={n} style={{ display: "flex", gap: 12, marginBottom: 12 }}>
                   <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#C28266", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{n}</div>
-                  <span style={{ fontSize: 13, color: "#3A2E28", lineHeight: 1.5 }}>{text.split("realize o pagamento").map((part, i) => i === 0 ? <span key={i}>{part}<strong>realize o pagamento</strong></span> : <span key={i}>{part}</span>)}</span>
+                  <span style={{ fontSize: 13, color: "#3A2E28", lineHeight: 1.5 }}>{text}</span>
                 </div>
               ))}
             </div>
