@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ChevronLeft, ShieldCheck, Truck, Package, Copy, MessageCircle, CheckCircle } from "lucide-react";
+import { ChevronLeft, Truck, Package, Copy, MessageCircle, CheckCircle, ShieldCheck } from "lucide-react";
 
 type CartItem = {
   cart_item_id: string;
@@ -61,6 +61,15 @@ function formatZip(v: string) {
   return v.replace(/\D/g, "").slice(0, 8).replace(/(\d{5})(\d)/, "$1-$2");
 }
 
+// ── Ícone por tipo de frete ──────────────────────────────────
+function ShippingIcon({ type }: { type: string }) {
+  const t = type.toLowerCase();
+  if (t.includes("pac")) return <span style={{ fontSize: 22 }}>📦</span>;
+  if (t.includes("sedex")) return <span style={{ fontSize: 22 }}>🚀</span>;
+  if (t.includes("transportadora")) return <span style={{ fontSize: 22 }}>🚛</span>;
+  return <span style={{ fontSize: 22 }}>🚚</span>;
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -71,7 +80,6 @@ export default function CheckoutPage() {
   const [selectedShipping, setSelectedShipping] = useState<ShippingRate | null>(null);
   const [hasInsurance, setHasInsurance] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [orderId, setOrderId] = useState<string | null>(null);
   const [cepLoading, setCepLoading] = useState(false);
   const [storeSettings, setStoreSettings] = useState<StoreSettings>({ pix_key: "", pix_holder: "", pix_bank: "", whatsapp_number: "" });
   const [copied, setCopied] = useState(false);
@@ -100,7 +108,6 @@ export default function CheckoutPage() {
     const sid = getSessionId();
     if (!sid) return;
     try {
-      setCartLoading(true);
       const { data: cart } = await supabase.from("carts").select("id").eq("session_id", sid).single();
       if (!cart) { setCartItems([]); return; }
       const { data: items } = await supabase
@@ -222,7 +229,6 @@ export default function CheckoutPage() {
       const { data: cart } = await supabase.from("carts").select("id").eq("session_id", sid).single();
       if (cart) await supabase.from("cart_items").delete().eq("cart_id", cart.id);
 
-      setOrderId(order.id);
       router.push(`/pedido/${order.id}`);
     } catch (err: any) {
       toast.error("Erro ao finalizar pedido: " + err.message);
@@ -385,45 +391,70 @@ export default function CheckoutPage() {
             {shippingRates.length === 0 ? (
               <p style={{ fontSize: 13, color: "#B0A090", textAlign: "center", padding: "20px 0" }}>Nenhuma opção disponível para {form.state}</p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {shippingRates.map(rate => {
                   const isTransportadora = rate.service_type.toLowerCase().includes("transportadora");
                   const insuranceValue = subtotal * 0.15;
+                  const isSelectedSemSeguro = selectedShipping?.id === rate.id && !hasInsurance;
+                  const isSelectedComSeguro = selectedShipping?.id === rate.id && hasInsurance;
 
                   return (
                     <div key={rate.id}>
-                      {/* Opção SEM seguro */}
-                      <label style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: `1.5px solid ${selectedShipping?.id === rate.id && !hasInsurance ? "#C28266" : "rgba(194,130,102,0.2)"}`, borderRadius: 10, cursor: "pointer", background: selectedShipping?.id === rate.id && !hasInsurance ? "rgba(194,130,102,0.04)" : "#fff", marginBottom: isTransportadora ? 8 : 0 }}>
-                        <input type="radio" name="shipping" checked={selectedShipping?.id === rate.id && !hasInsurance} onChange={() => { setSelectedShipping(rate); setHasInsurance(false); }} style={{ accentColor: "#C28266" }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 14, fontWeight: 600 }}>
-                            {rate.service_type}
-                            <span style={{ fontSize: 12, color: "#A8978E", fontWeight: 400 }}> (sem seguro)</span>
-                          </div>
-                          <div style={{ fontSize: 12, color: "#A8978E", marginTop: 2 }}>Envio padrão</div>
+                      {/* ── Opção SEM seguro ── */}
+                      <label onClick={() => { setSelectedShipping(rate); setHasInsurance(false); }}
+                        style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: `1.5px solid ${isSelectedSemSeguro ? "#C28266" : "rgba(194,130,102,0.2)"}`, borderRadius: 12, cursor: "pointer", background: isSelectedSemSeguro ? "rgba(194,130,102,0.04)" : "#fff", marginBottom: isTransportadora ? 10 : 0, transition: "all 0.2s" }}>
+                        {/* Ícone */}
+                        <div style={{ width: 42, height: 42, borderRadius: 10, background: isSelectedSemSeguro ? "rgba(194,130,102,0.12)" : "#FAF8EF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <ShippingIcon type={rate.service_type} />
                         </div>
-                        <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 15, fontWeight: 700, color: "#C28266" }}>
-                          R$ {Number(rate.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        {/* Info */}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#0D0F13" }}>{rate.service_type} <span style={{ fontSize: 12, fontWeight: 400, color: "#A8978E" }}>(sem seguro)</span></div>
+                          <div style={{ fontSize: 12, color: "#A8978E", marginTop: 3 }}>Envio padrão</div>
+                        </div>
+                        {/* Preço + radio */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 15, fontWeight: 700, color: "#C28266" }}>
+                            R$ {Number(rate.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          </div>
+                          <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${isSelectedSemSeguro ? "#C28266" : "#D0C0B0"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            {isSelectedSemSeguro && <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#C28266" }} />}
+                          </div>
                         </div>
                       </label>
 
-                      {/* Opção COM seguro — só para transportadora */}
+                      {/* ── Opção COM seguro (só transportadora) ── */}
                       {isTransportadora && (
-                        <label style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: `1.5px solid ${selectedShipping?.id === rate.id && hasInsurance ? "#5A8F70" : "rgba(122,175,144,0.3)"}`, borderRadius: 10, cursor: "pointer", background: selectedShipping?.id === rate.id && hasInsurance ? "rgba(122,175,144,0.06)" : "rgba(122,175,144,0.02)" }}>
-                          <input type="radio" name="shipping" checked={selectedShipping?.id === rate.id && hasInsurance} onChange={() => { setSelectedShipping(rate); setHasInsurance(true); }} style={{ accentColor: "#5A8F70" }} />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 14, fontWeight: 600 }}>
-                              {rate.service_type}
-                              <span style={{ fontSize: 12, color: "#5A8F70", fontWeight: 600 }}> + Seguro 🔒</span>
-                            </div>
-                            <div style={{ fontSize: 12, color: "#7A6558", marginTop: 2 }}>Garante reenvio em caso de extravio</div>
+                        <label onClick={() => { setSelectedShipping(rate); setHasInsurance(true); }}
+                          style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: `1.5px solid ${isSelectedComSeguro ? "#C28266" : "rgba(194,130,102,0.2)"}`, borderRadius: 12, cursor: "pointer", background: isSelectedComSeguro ? "rgba(194,130,102,0.04)" : "#fff", transition: "all 0.2s" }}>
+                          {/* Ícone escudo */}
+                          <div style={{ width: 42, height: 42, borderRadius: 10, background: isSelectedComSeguro ? "rgba(194,130,102,0.12)" : "#FAF8EF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <ShieldCheck size={22} color="#C28266" />
                           </div>
-                          <div style={{ textAlign: "right" }}>
-                            <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 15, fontWeight: 700, color: "#5A8F70" }}>
-                              R$ {(Number(rate.price) + insuranceValue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          {/* Info */}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 14, fontWeight: 700, color: "#0D0F13" }}>{rate.service_type}</span>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: "#C28266", background: "rgba(194,130,102,0.12)", border: "1px solid rgba(194,130,102,0.3)", borderRadius: 20, padding: "2px 8px", letterSpacing: 0.5, textTransform: "uppercase" }}>
+                                COM SEGURO
+                              </span>
                             </div>
-                            <div style={{ fontSize: 10, color: "#A8978E", marginTop: 2 }}>
-                              frete + R$ {insuranceValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} seguro
+                            <div style={{ fontSize: 12, color: "#7A6558", marginTop: 3 }}>
+                              Com seguro + acréscimo de 15% no total da compra
+                            </div>
+                          </div>
+                          {/* Preço + radio */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 15, fontWeight: 700, color: "#C28266" }}>
+                                R$ {(Number(rate.price) + insuranceValue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                              </div>
+                              <div style={{ fontSize: 10, color: "#A8978E", marginTop: 2 }}>
+                                + R$ {insuranceValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} seguro
+                              </div>
+                            </div>
+                            <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${isSelectedComSeguro ? "#C28266" : "#D0C0B0"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                              {isSelectedComSeguro && <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#C28266" }} />}
                             </div>
                           </div>
                         </label>
