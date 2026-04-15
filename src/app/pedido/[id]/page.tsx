@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle, Copy, Clock, RefreshCw } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 
 type Order = {
   id: string;
@@ -20,9 +20,6 @@ type Order = {
   subtotal: number;
   total: number;
   payment_status: string;
-  pagseguro_qrcode: string | null;
-  pagseguro_qrcode_text: string | null;
-  pagseguro_order_id: string | null;
   created_at: string;
 };
 
@@ -40,9 +37,6 @@ export default function PedidoPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generatingPix, setGeneratingPix] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(1800);
 
   useEffect(() => {
     if (!id) return;
@@ -56,10 +50,6 @@ export default function PedidoPage() {
         const { data: itemsData } = await supabase
           .from("order_items").select("*").eq("order_id", id);
         setItems(itemsData || []);
-
-        if (!orderData.pagseguro_qrcode && orderData.payment_status === "pending") {
-          await generatePix(orderData);
-        }
       } catch (err: any) {
         toast.error("Pedido não encontrado");
         router.push("/");
@@ -69,79 +59,6 @@ export default function PedidoPage() {
     }
     load();
   }, [id]);
-
-  // Realtime — detecta pagamento e recarrega a página
-  useEffect(() => {
-    if (!id) return;
-    const channel = supabase
-      .channel(`order-${id}`)
-      .on("postgres_changes", {
-        event: "UPDATE",
-        schema: "public",
-        table: "orders",
-        filter: `id=eq.${id}`,
-      }, (payload) => {
-        setOrder((prev) => prev ? { ...prev, ...payload.new } : prev);
-        if (payload.new.payment_status === "paid") {
-          toast.success("🎉 Pagamento confirmado!");
-          setTimeout(() => {
-            window.location.reload();
-          }, 1500);
-        }
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [id]);
-
-  // Timer de expiração
-  useEffect(() => {
-    if (!order?.pagseguro_qrcode || order.payment_status === "paid") return;
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) { clearInterval(timer); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [order?.pagseguro_qrcode, order?.payment_status]);
-
-  const generatePix = async (orderData: Order) => {
-    setGeneratingPix(true);
-    try {
-      const res = await fetch("/api/pagseguro/create-pix", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: orderData.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao gerar Pix");
-      setOrder((prev) => prev ? {
-        ...prev,
-        pagseguro_qrcode: data.qrcode,
-        pagseguro_qrcode_text: data.qrcodeText,
-      } : prev);
-      setTimeLeft(1800);
-    } catch (err: any) {
-      toast.error("Erro ao gerar Pix: " + err.message);
-    } finally {
-      setGeneratingPix(false);
-    }
-  };
-
-  const copyPix = () => {
-    if (!order?.pagseguro_qrcode_text) return;
-    navigator.clipboard.writeText(order.pagseguro_qrcode_text);
-    setCopied(true);
-    toast.success("Código Pix copiado!");
-    setTimeout(() => setCopied(false), 3000);
-  };
-
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60).toString().padStart(2, "0");
-    const sec = (s % 60).toString().padStart(2, "0");
-    return `${m}:${sec}`;
-  };
 
   if (loading) {
     return (
@@ -177,31 +94,21 @@ export default function PedidoPage() {
 
         .card { background: #fff; border: 1px solid rgba(194,130,102,0.18); border-radius: 14px; padding: 24px; margin-bottom: 16px; animation: fadeIn 0.4s ease both; }
 
-        /* Pago */
-        .paid-box { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 32px 16px; text-align: center; }
-        .paid-icon { width: 80px; height: 80px; background: rgba(122,175,144,0.1); border: 2px solid #7AAF90; border-radius: 50%; display: flex; align-items: center; justify-content: center; animation: pulse 2s ease-in-out infinite; }
-        .paid-title { font-family: "Raleway", sans-serif; font-size: 24px; font-weight: 700; color: #5A8F70; }
-        .paid-sub { font-size: 14px; color: #7A6558; line-height: 1.6; max-width: 400px; }
-        .paid-steps { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 380px; margin-top: 8px; }
-        .paid-step { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: rgba(122,175,144,0.06); border: 1px solid rgba(122,175,144,0.2); border-radius: 10px; font-size: 13px; color: #3A2E28; text-align: left; }
-        .paid-step-num { width: 24px; height: 24px; border-radius: 50%; background: #7AAF90; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        /* Confirmado */
+        .confirmed-box { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 32px 16px; text-align: center; }
+        .confirmed-icon { width: 80px; height: 80px; background: rgba(122,175,144,0.1); border: 2px solid #7AAF90; border-radius: 50%; display: flex; align-items: center; justify-content: center; animation: pulse 2s ease-in-out infinite; }
+        .confirmed-title { font-family: "Raleway", sans-serif; font-size: 24px; font-weight: 700; color: #5A8F70; }
+        .confirmed-sub { font-size: 14px; color: #7A6558; line-height: 1.6; max-width: 400px; }
+        .confirmed-steps { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 380px; margin-top: 8px; }
+        .confirmed-step { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: rgba(122,175,144,0.06); border: 1px solid rgba(122,175,144,0.2); border-radius: 10px; font-size: 13px; color: #3A2E28; text-align: left; }
+        .confirmed-step-num { width: 24px; height: 24px; border-radius: 50%; background: #7AAF90; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
-        /* Pix */
-        .pix-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-        .pix-title { font-family: "Raleway", sans-serif; font-size: 15px; font-weight: 700; color: #0D0F13; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
-        .pix-timer { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
-        .qrcode-wrap { display: flex; justify-content: center; margin-bottom: 20px; }
-        .qrcode-wrap img { width: 220px; height: 220px; border-radius: 12px; border: 2px solid rgba(194,130,102,0.2); }
-        .qrcode-placeholder { width: 220px; height: 220px; border-radius: 12px; border: 2px dashed rgba(194,130,102,0.3); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: #B0A090; font-size: 13px; }
-        .pix-separator { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; color: #B0A090; font-size: 12px; }
-        .pix-separator::before, .pix-separator::after { content: ""; flex: 1; height: 1px; background: rgba(194,130,102,0.15); }
-        .pix-code-box { background: #FAF8EF; border: 1px solid rgba(194,130,102,0.25); border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-        .pix-code-text { flex: 1; font-size: 11px; color: #7A6558; word-break: break-all; line-height: 1.4; font-family: monospace; }
-        .copy-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0; font-family: "Raleway", sans-serif; }
-        .pix-info { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: #7A6558; line-height: 1.5; padding: 10px 14px; background: rgba(194,130,102,0.06); border-radius: 8px; }
-
-        /* Aguardando */
-        .waiting-badge { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; background: rgba(212,169,106,0.1); border: 1px solid rgba(212,169,106,0.25); border-radius: 8px; margin-top: 12px; font-size: 12px; color: #8A6830; font-weight: 500; }
+        /* Aguardando comprovante */
+        .waiting-box { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 32px 16px; text-align: center; }
+        .waiting-icon { font-size: 48px; }
+        .waiting-title { font-family: "Raleway", sans-serif; font-size: 22px; font-weight: 700; color: #D4A96A; }
+        .waiting-sub { font-size: 14px; color: #7A6558; line-height: 1.6; max-width: 400px; }
+        .waiting-badge { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; background: rgba(212,169,106,0.1); border: 1px solid rgba(212,169,106,0.25); border-radius: 8px; font-size: 12px; color: #8A6830; font-weight: 500; }
         .waiting-dot { width: 8px; height: 8px; border-radius: 50%; background: #D4A96A; animation: blink 1.5s ease-in-out infinite; }
         @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
@@ -226,9 +133,6 @@ export default function PedidoPage() {
         .info-row span { color: #7A6558; }
         .info-row strong { color: #0D0F13; font-weight: 500; }
 
-        .regen-btn { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: transparent; border: 1.5px solid rgba(194,130,102,0.4); border-radius: 8px; color: #C28266; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; margin: 0 auto; font-family: "Raleway", sans-serif; }
-        .regen-btn:hover { background: rgba(194,130,102,0.06); }
-
         .back-link { display: block; text-align: center; margin-top: 20px; font-size: 13px; color: #A8978E; text-decoration: none; }
         .back-link:hover { color: #C28266; }
       `}</style>
@@ -237,99 +141,55 @@ export default function PedidoPage() {
         <div className="page-top">
           <div className="order-num">Pedido #{order.id.slice(0, 8).toUpperCase()}</div>
           <h1 className="page-title">
-            {isPaid ? "Pedido " : "Finalizar "}
-            <span>{isPaid ? "Confirmado! 🎉" : "Pagamento"}</span>
+            {isPaid ? "Pedido " : "Pedido "}
+            <span>{isPaid ? "Confirmado! 🎉" : "Recebido!"}</span>
           </h1>
         </div>
 
         {/* PAGO */}
-        {isPaid && (
+        {isPaid ? (
           <div className="card">
-            <div className="paid-box">
-              <div className="paid-icon">
+            <div className="confirmed-box">
+              <div className="confirmed-icon">
                 <CheckCircle size={40} color="#5A8F70" />
               </div>
-              <div className="paid-title">Pagamento confirmado!</div>
-              <div className="paid-sub">
+              <div className="confirmed-title">Pagamento confirmado!</div>
+              <div className="confirmed-sub">
                 Olá, <strong>{order.customer_name.split(" ")[0]}</strong>! 🎉<br />
                 Seu pedido foi aprovado e será preparado com carinho.<br />
                 Você receberá confirmação no WhatsApp <strong>{order.customer_phone}</strong>.
               </div>
-              <div className="paid-steps">
-                <div className="paid-step">
-                  <div className="paid-step-num">1</div>
+              <div className="confirmed-steps">
+                <div className="confirmed-step">
+                  <div className="confirmed-step-num">1</div>
                   Pagamento confirmado ✓
                 </div>
-                <div className="paid-step">
-                  <div className="paid-step-num">2</div>
+                <div className="confirmed-step">
+                  <div className="confirmed-step-num">2</div>
                   Separação e embalagem em até 72h úteis
                 </div>
-                <div className="paid-step">
-                  <div className="paid-step-num">3</div>
+                <div className="confirmed-step">
+                  <div className="confirmed-step-num">3</div>
                   Envio com código de rastreio via WhatsApp
                 </div>
               </div>
             </div>
           </div>
-        )}
-
-        {/* PIX */}
-        {!isPaid && (
+        ) : (
           <div className="card">
-            <div className="pix-header">
-              <div className="pix-title">
-                💳 Pague com Pix
+            <div className="waiting-box">
+              <div className="waiting-icon">📋</div>
+              <div className="waiting-title">Pedido enviado!</div>
+              <div className="waiting-sub">
+                Olá, <strong>{order.customer_name.split(" ")[0]}</strong>!<br />
+                Seu pedido foi registrado e enviado via WhatsApp.<br />
+                Aguarde a confirmação do vendedor após enviar o comprovante.
               </div>
-              {order.pagseguro_qrcode && timeLeft > 0 && (
-                <div className="pix-timer" style={{ color: timeLeft < 300 ? "#C0614F" : "#D4A96A" }}>
-                  <Clock size={14} />
-                  Expira em {formatTime(timeLeft)}
-                </div>
-              )}
+              <div className="waiting-badge">
+                <div className="waiting-dot" />
+                Aguardando confirmação do pagamento...
+              </div>
             </div>
-
-            {generatingPix ? (
-              <div className="qrcode-wrap">
-                <div className="qrcode-placeholder">
-                  <div style={{ width: 32, height: 32, border: "3px solid #EDE8DA", borderTop: "3px solid #C28266", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  Gerando QR Code...
-                </div>
-              </div>
-            ) : order.pagseguro_qrcode && timeLeft > 0 ? (
-              <>
-                <div className="qrcode-wrap">
-                  <img src={`data:image/png;base64,${order.pagseguro_qrcode}`} alt="QR Code Pix" />
-                </div>
-                <div className="pix-separator">ou copie o código abaixo</div>
-                <div className="pix-code-box">
-                  <span className="pix-code-text">{order.pagseguro_qrcode_text}</span>
-                  <button
-                    className="copy-btn"
-                    onClick={copyPix}
-                    style={{ background: copied ? "#7AAF90" : "#C28266" }}
-                  >
-                    <Copy size={13} />
-                    {copied ? "Copiado!" : "Copiar"}
-                  </button>
-                </div>
-                <div className="pix-info">
-                  📌 Abra o app do seu banco → Pix → Ler QR Code ou Pix Copia e Cola. O pagamento é confirmado em segundos.
-                </div>
-                <div className="waiting-badge">
-                  <div className="waiting-dot" />
-                  Aguardando confirmação do pagamento...
-                </div>
-              </>
-            ) : (
-              <div style={{ textAlign: "center", padding: "20px 0" }}>
-                <p style={{ color: "#C0614F", fontSize: 14, marginBottom: 16 }}>
-                  {timeLeft === 0 ? "QR Code expirado." : "Não foi possível gerar o QR Code."}
-                </p>
-                <button className="regen-btn" onClick={() => order && generatePix(order)}>
-                  <RefreshCw size={14} /> Gerar novo QR Code
-                </button>
-              </div>
-            )}
           </div>
         )}
 
