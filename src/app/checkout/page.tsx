@@ -416,7 +416,9 @@ export default function CheckoutPage() {
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 14, fontWeight: 700, color: "#0D0F13" }}>{rate.service_type} <span style={{ fontSize: 12, fontWeight: 400, color: "#A8978E" }}>(sem seguro)</span></div>
-                          <div style={{ fontSize: 12, color: "#A8978E", marginTop: 3 }}>Envio padrão</div>
+                          <div style={{ fontSize: 12, color: "#A8978E", marginTop: 3 }}>
+                            {rate.service_type.toLowerCase().includes("pac") ? "Correios — PAC" : rate.service_type.toLowerCase().includes("sedex") ? "Correios — SEDEX" : "Envio por transportadora"}
+                          </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                           <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 15, fontWeight: 700, color: "#C28266" }}>
