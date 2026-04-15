@@ -61,7 +61,6 @@ function formatZip(v: string) {
   return v.replace(/\D/g, "").slice(0, 8).replace(/(\d{5})(\d)/, "$1-$2");
 }
 
-// ── Ícone por tipo de frete ──────────────────────────────────
 function ShippingIcon({ type }: { type: string }) {
   const t = type.toLowerCase();
   if (t.includes("pac")) return <span style={{ fontSize: 22 }}>📦</span>;
@@ -80,6 +79,7 @@ export default function CheckoutPage() {
   const [selectedShipping, setSelectedShipping] = useState<ShippingRate | null>(null);
   const [hasInsurance, setHasInsurance] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [orderId, setOrderId] = useState<string | null>(null); // ← guarda o ID do pedido criado
   const [cepLoading, setCepLoading] = useState(false);
   const [storeSettings, setStoreSettings] = useState<StoreSettings>({ pix_key: "", pix_holder: "", pix_bank: "", whatsapp_number: "" });
   const [copied, setCopied] = useState(false);
@@ -186,6 +186,7 @@ export default function CheckoutPage() {
     return true;
   };
 
+  // ── Cria o pedido e vai para tela de pagamento ──
   const submitOrder = async () => {
     setSubmitting(true);
     try {
@@ -225,11 +226,14 @@ export default function CheckoutPage() {
       }));
       await supabase.from("order_items").insert(orderItems);
 
+      // Limpa carrinho
       const sid = getSessionId();
       const { data: cart } = await supabase.from("carts").select("id").eq("session_id", sid).single();
       if (cart) await supabase.from("cart_items").delete().eq("cart_id", cart.id);
 
-      router.push(`/pedido/${order.id}`);
+      // Salva o ID e vai para tela de pagamento (NÃO redireciona ainda)
+      setOrderId(order.id);
+      setStep("pagamento");
     } catch (err: any) {
       toast.error("Erro ao finalizar pedido: " + err.message);
     } finally {
@@ -244,12 +248,17 @@ export default function CheckoutPage() {
     setTimeout(() => setCopied(false), 3000);
   };
 
+  // ── Abre WhatsApp e redireciona para página do pedido ──
   const openWhatsApp = () => {
     const itens = cartItems.map(i => `${i.quantity}x ${i.product.name}${i.product.brand ? ` (${i.product.brand})` : ""} - R$ ${(Number(i.product.price) * i.quantity).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`).join("\n");
-    const msg = `*NOVO PEDIDO - PB Imports*\n\nNome: ${form.name}\nCPF: ${form.cpf}\nTelefone: ${form.phone}\nEndereço: ${form.street}, ${form.number}${form.complement ? ` - ${form.complement}` : ""}\nBairro: ${form.district}\nCidade/Estado: ${form.city}/${form.state}\nCEP: ${form.zip}\n\n${itens}\n\nSubtotal: R$ ${subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\nFrete (${selectedShipping?.service_type}): R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\nSeguro: ${hasInsurance ? `Sim - R$ ${insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "Não"}\n*Total Final: R$ ${total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`;
+    const seguroText = hasInsurance ? `\nSeguro (15%): R$ ${insurancePrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "";
+    const msg = `*NOVO PEDIDO - PB Imports*\n\nNome: ${form.name}\nCPF: ${form.cpf}\nTelefone: ${form.phone}\nEndereço: ${form.street}, ${form.number}${form.complement ? ` - ${form.complement}` : ""}\nBairro: ${form.district}\nCidade/Estado: ${form.city}/${form.state}\nCEP: ${form.zip}\n\n${itens}\n\nSubtotal: R$ ${subtotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\nFrete (${selectedShipping?.service_type}): R$ ${shippingPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}${seguroText}\n*Total Final: R$ ${total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`;
     const number = storeSettings.whatsapp_number.replace(/\D/g, "");
     window.open(`https://wa.me/${number}?text=${encodeURIComponent(msg)}`, "_blank");
-    setTimeout(() => setStep("confirmado"), 1500);
+    // Redireciona para página do pedido após abrir WhatsApp
+    setTimeout(() => {
+      if (orderId) router.push(`/pedido/${orderId}`);
+    }, 1500);
   };
 
   if (!mounted || cartLoading) return (
@@ -400,19 +409,15 @@ export default function CheckoutPage() {
 
                   return (
                     <div key={rate.id}>
-                      {/* ── Opção SEM seguro ── */}
                       <label onClick={() => { setSelectedShipping(rate); setHasInsurance(false); }}
                         style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: `1.5px solid ${isSelectedSemSeguro ? "#C28266" : "rgba(194,130,102,0.2)"}`, borderRadius: 12, cursor: "pointer", background: isSelectedSemSeguro ? "rgba(194,130,102,0.04)" : "#fff", marginBottom: isTransportadora ? 10 : 0, transition: "all 0.2s" }}>
-                        {/* Ícone */}
                         <div style={{ width: 42, height: 42, borderRadius: 10, background: isSelectedSemSeguro ? "rgba(194,130,102,0.12)" : "#FAF8EF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                           <ShippingIcon type={rate.service_type} />
                         </div>
-                        {/* Info */}
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 14, fontWeight: 700, color: "#0D0F13" }}>{rate.service_type} <span style={{ fontSize: 12, fontWeight: 400, color: "#A8978E" }}>(sem seguro)</span></div>
                           <div style={{ fontSize: 12, color: "#A8978E", marginTop: 3 }}>Envio padrão</div>
                         </div>
-                        {/* Preço + radio */}
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                           <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 15, fontWeight: 700, color: "#C28266" }}>
                             R$ {Number(rate.price).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
@@ -423,15 +428,12 @@ export default function CheckoutPage() {
                         </div>
                       </label>
 
-                      {/* ── Opção COM seguro (só transportadora) ── */}
                       {isTransportadora && (
                         <label onClick={() => { setSelectedShipping(rate); setHasInsurance(true); }}
                           style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: `1.5px solid ${isSelectedComSeguro ? "#C28266" : "rgba(194,130,102,0.2)"}`, borderRadius: 12, cursor: "pointer", background: isSelectedComSeguro ? "rgba(194,130,102,0.04)" : "#fff", transition: "all 0.2s" }}>
-                          {/* Ícone escudo */}
                           <div style={{ width: 42, height: 42, borderRadius: 10, background: isSelectedComSeguro ? "rgba(194,130,102,0.12)" : "#FAF8EF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                             <ShieldCheck size={22} color="#C28266" />
                           </div>
-                          {/* Info */}
                           <div style={{ flex: 1 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                               <span style={{ fontSize: 14, fontWeight: 700, color: "#0D0F13" }}>{rate.service_type}</span>
@@ -439,19 +441,14 @@ export default function CheckoutPage() {
                                 COM SEGURO
                               </span>
                             </div>
-                            <div style={{ fontSize: 12, color: "#7A6558", marginTop: 3 }}>
-                              Com seguro + acréscimo de 15% no total da compra
-                            </div>
+                            <div style={{ fontSize: 12, color: "#7A6558", marginTop: 3 }}>Com seguro + acréscimo de 15% no total da compra</div>
                           </div>
-                          {/* Preço + radio */}
                           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                             <div style={{ textAlign: "right" }}>
                               <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 15, fontWeight: 700, color: "#C28266" }}>
                                 R$ {(Number(rate.price) + insuranceValue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                               </div>
-                              <div style={{ fontSize: 10, color: "#A8978E", marginTop: 2 }}>
-                                + R$ {insuranceValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} seguro
-                              </div>
+                              <div style={{ fontSize: 10, color: "#A8978E", marginTop: 2 }}>+ R$ {insuranceValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} seguro</div>
                             </div>
                             <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${isSelectedComSeguro ? "#C28266" : "#D0C0B0"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                               {isSelectedComSeguro && <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#C28266" }} />}
@@ -465,7 +462,6 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* Resumo */}
             <div style={{ marginTop: 20, padding: 16, background: "#FAF8EF", borderRadius: 10, border: "1px solid rgba(194,130,102,0.15)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
                 <span style={{ color: "#7A6558" }}>Subtotal produtos</span>
@@ -503,7 +499,8 @@ export default function CheckoutPage() {
         {/* STEP: PAGAMENTO */}
         {step === "pagamento" && (
           <div style={{ background: "#fff", border: "1px solid rgba(194,130,102,0.18)", borderRadius: 14, padding: 24 }}>
-            <div style={{ marginBottom: 24, padding: 16, background: "#FAF8EF", borderRadius: 10, border: "1px solid rgba(194,130,102,0.15)" }}>
+            {/* Resumo */}
+            <div style={{ marginBottom: 20, padding: 16, background: "#FAF8EF", borderRadius: 10, border: "1px solid rgba(194,130,102,0.15)" }}>
               <div style={{ fontFamily: "Raleway, sans-serif", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12, color: "#7A6558" }}>Resumo do Pedido</div>
               {cartItems.map(i => (
                 <div key={i.cart_item_id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
@@ -521,6 +518,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
+            {/* Chave PIX */}
             <div style={{ padding: 20, background: "#fff", border: "1px solid rgba(194,130,102,0.2)", borderRadius: 12, marginBottom: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, fontFamily: "Raleway, sans-serif", fontSize: 14, fontWeight: 700, color: "#0D0F13" }}>
                 💳 Pagamento via PIX
@@ -549,6 +547,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
+            {/* Como finalizar */}
             <div style={{ padding: 20, background: "#FAF8EF", borderRadius: 12, marginBottom: 16 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#A8978E", textTransform: "uppercase", letterSpacing: 1, marginBottom: 14 }}>Como Finalizar</div>
               {[
@@ -569,7 +568,7 @@ export default function CheckoutPage() {
             </button>
             <button onClick={() => router.push("/")}
               style={{ width: "100%", padding: 12, background: "transparent", color: "#7A6558", border: "1px solid rgba(194,130,102,0.25)", borderRadius: 10, fontFamily: "Raleway, sans-serif", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-              Voltar
+              Voltar ao catálogo
             </button>
           </div>
         )}
@@ -591,7 +590,7 @@ export default function CheckoutPage() {
                 style={{ padding: "12px 24px", background: "transparent", color: "#7A6558", border: "1px solid rgba(194,130,102,0.3)", borderRadius: 10, fontFamily: "Raleway, sans-serif", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
                 Ver Produtos
               </button>
-              <button onClick={() => { setStep("dados"); setForm({ name: "", cpf: "", phone: "", street: "", number: "", complement: "", district: "", zip: "", city: "", state: "" }); setSelectedShipping(null); setHasInsurance(false); }}
+              <button onClick={() => { setStep("dados"); setForm({ name: "", cpf: "", phone: "", street: "", number: "", complement: "", district: "", zip: "", city: "", state: "" }); setSelectedShipping(null); setHasInsurance(false); setOrderId(null); }}
                 style={{ padding: "12px 24px", background: "#C28266", color: "#fff", border: "none", borderRadius: 10, fontFamily: "Raleway, sans-serif", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                 Novo Pedido
               </button>
